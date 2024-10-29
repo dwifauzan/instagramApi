@@ -1,240 +1,362 @@
-import { useEffect, useState } from 'react';
-import { Button, Carousel, Col, Modal, Progress, Row } from 'antd';
-import { useRouter } from 'next/router';
-import Image from 'next/image';
-import { UilFile, UilHeart } from '@iconscout/react-unicons';
-import { PageHeaders } from '@/components/page-headers';
-import { useNotification } from '../../crud/axios/handler/error';
+import {
+    Checkbox,
+    Button,
+    Carousel,
+    Col,
+    Modal,
+    Progress,
+    Row,
+    Spin,
+} from 'antd'
+import { useEffect, useState, useRef } from 'react'
+import { useRouter } from 'next/router'
+import Image from 'next/image'
+import { UilFile, UilHeart } from '@iconscout/react-unicons'
+import { PageHeaders } from '@/components/page-headers'
+import { useNotification } from '../../crud/axios/handler/error'
+import axios from 'axios'
 
 interface MediaItem {
-    mediaType: string; // photo, video, or carousel
-    url: string;
+    mediaType: string
+    url: string
 }
 
 interface Feed {
-    id: string;
-    mediaItems: MediaItem[]; // Multiple media items for carousel
-    mediaType: number;
-    caption: string;
-    likeCount: number;
-    commentCount: number;
-    takenAt: Date;
+    id: string
+    mediaItems: MediaItem[]
+    mediaType: number
+    caption: string
+    likeCount: number
+    commentCount: number
+    takenAt: Date
 }
 
 function BlogTwo() {
-    const router = useRouter();
-    const [feeds, setFeeds] = useState<Feed[]>([]);
-    const [nextMaxPage, setNextMaxPage] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [hasMore, setHasMore] = useState(true);
-    const { name } = router.query;
-    const [modalVisible, setModalVisible] = useState(false);
-    const [downloadProgress, setDownloadProgress] = useState(0);
-    const [totalFiles, setTotalFiles] = useState(0);
-    const { openNotificationWithIcon } = useNotification();
+    const router = useRouter()
+    const [feeds, setFeeds] = useState<Feed[]>([])
+    const [selectedMedia, setSelectedMedia] = useState<Set<string>>(new Set())
+    const [nextMaxPage, setNextMaxPage] = useState('')
+    const [allSelected, setAllSelected] = useState(false)
+    const [loading, setLoading] = useState(false)
+    const [modalVisible, setModalVisible] = useState(false)
+    const [downloadProgress, setDownloadProgress] = useState(0)
+    const [totalFiles, setTotalFiles] = useState(0)
+    const { openNotificationWithIcon } = useNotification()
+    const abortController = useRef<AbortController | null>(null)
 
     useEffect(() => {
-        if (name) {
-            hastagsFeeds();
+        if (router.query.name) {
+            hastagsFeeds()
         }
-    }, [name]);
+    }, [router.query.name])
 
     const hastagsFeeds = async () => {
-        if (loading || !hasMore) return;
-        setLoading(true);
+        if (loading) return
+        setLoading(true)
         try {
-            const token = sessionStorage.getItem(sessionStorage.key(0)!);
+            const token = sessionStorage.getItem(sessionStorage.key(0)!)
             if (!token) {
-                openNotificationWithIcon('error', 'Missing token', 'Session hilang, silahkan login ulang');
-                return;
+                openNotificationWithIcon(
+                    'error',
+                    'Failed to load',
+                    'Session expired. Please login again'
+                )
+                return
             }
-            const response = await fetch(`http://192.168.18.45:5000/api/v1/feeds/hastag/${name}?next_max_id=${nextMaxPage}`, {
-                method: 'GET',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'X-License-Key': 'akrmxgkgfkjarhfakzmgakjherfgkaueygzamkhj',
-                },
-            });
-            const data = await response.json();
-            if (Array.isArray(data.data)) {
-                setFeeds((prevFeeds) => [...prevFeeds, ...data.data]);
-                setNextMaxPage(data.next_max_id || '');
-                setHasMore(!!data.next_max_id);
+            const response = await axios.get(
+                `http://192.168.18.45:5000/api/v1/feeds/hastag/${router.query.name}?next_max_id=${nextMaxPage}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            )
+            if (Array.isArray(response.data.data)) {
+                setFeeds(response.data.data)
+                setNextMaxPage(response.data.next_max_id)
             } else {
-                setHasMore(false);
-                openNotificationWithIcon('error', 'Failed to load', `${data.message}`);
+                openNotificationWithIcon(
+                    'error',
+                    'Failed to load',
+                    `${response.data.message}`
+                )
             }
         } catch (err: any) {
-            openNotificationWithIcon('error', 'Failed to load', `${err.message}`);
+            openNotificationWithIcon(
+                'error',
+                'Failed to load',
+                `${err.message}`
+            )
         }
-        setLoading(false);
-    };
+        setLoading(false)
+    }
 
-    const filterFeeds = (media: MediaItem) => {
-        if (media.mediaType === 'photo') {
-            return (
-                <Image
-                    src={media.url}
-                    alt={media.mediaType}
-                    width={250}
-                    height={350}
-                    className="inline-block w-full"
-                />
-            );
-        } else if (media.mediaType === 'video') {
-            return (
-                <video controls className="inline-block h-96 w-full">
-                    <source src={media.url} type="video/mp4" />
-                </video>
-            );
+    const handleModalCancel = () => {
+        setModalVisible(false)
+        if (abortController.current) {
+            abortController.current.abort()
         }
-    };
+        setDownloadProgress(0)
+    }
 
-    const handleScroll = () => {
-        if (
-            window.innerHeight + document.documentElement.scrollTop !==
-                document.documentElement.offsetHeight ||
-            loading
-        ) {
-            return;
+    const toggleSelectMedia = (mediaKey: string) => {
+        setSelectedMedia((prevSelected) => {
+            const newSelected = new Set(prevSelected)
+            if (newSelected.has(mediaKey)) {
+                newSelected.delete(mediaKey)
+            } else {
+                newSelected.add(mediaKey)
+            }
+            return newSelected
+        })
+    }
+
+    const toggleSelectAll = () => {
+        setAllSelected(!allSelected)
+        if (!allSelected) {
+            const allMediaKeys = new Set(
+                feeds.flatMap((feed) =>
+                    feed.mediaItems.map((media) => `${feed.id}-${media.url}`)
+                )
+            )
+            setSelectedMedia(allMediaKeys)
+        } else {
+            setSelectedMedia(new Set())
         }
-        hastagsFeeds();
-    };
-
-    useEffect(() => {
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, [loading, nextMaxPage]);
+    }
 
     const downloadAllMedia = async () => {
-        const result = await (window as any).electron.selectDownloadDirectory();
-        if (!result || result.canceled || !Array.isArray(result.filePaths) || !result.filePaths.length) return;
+        const downloadPath = await (
+            window as any
+        ).electron.selectDownloadDirectory()
+        if (!downloadPath) return
 
-        const downloadPath = result.filePaths[0];
-        
-        setModalVisible(true);
-        setDownloadProgress(0);
-        const total = feeds.reduce((acc, feed) => acc + feed.mediaItems.length, 0);
-        setTotalFiles(total);
+        setModalVisible(true)
+        setDownloadProgress(0)
 
-        let downloadedFiles = 0;
+        const selectedFeeds = feeds.map((feed) => ({
+            ...feed,
+            mediaItems: feed.mediaItems.filter((media) =>
+                selectedMedia.has(`${feed.id}-${media.url}`)
+            ),
+        }))
 
-        for (const feed of feeds) {
-            for (const media of feed.mediaItems) {
-                try {
-                    await (window as any).electron.downloadFile(media.url, downloadPath, media.mediaType, feed.caption);
-                    downloadedFiles++;
-                    setDownloadProgress(Math.round((downloadedFiles / total) * 100));
-                } catch (err: any) {
-                    openNotificationWithIcon('error', 'Download failed', `${err.message}`);
-                }
+        const total = selectedFeeds.reduce(
+            (acc, feed) => acc + feed.mediaItems.length,
+            0
+        )
+        setTotalFiles(total)
+        let downloadedFiles = 0
+
+        abortController.current = new AbortController()
+        const signal = abortController.current.signal
+
+        try {
+            for (const feed of selectedFeeds) {
+                if (feed.mediaItems.length === 0) continue
+                await (window as any).electron.startDownload(
+                    downloadPath,
+                    feed,
+                    signal
+                )
+                downloadedFiles += feed.mediaItems.length
+                setDownloadProgress(Math.round((downloadedFiles / total) * 100))
+
+                if (signal.aborted) break
+            }
+        } catch (err: any) {
+            if (signal.aborted) {
+                openNotificationWithIcon(
+                    'error',
+                    'Download Cancelled',
+                    'Proses download telah dibatalkan'
+                )
+            } else {
+                openNotificationWithIcon(
+                    'error',
+                    'Download failed',
+                    `${err.message}`
+                )
             }
         }
-        setModalVisible(false);
-        setDownloadProgress(0);
-    };
 
-    const PageRoutes = [
-        {
-            path: 'index',
-            breadcrumbName: 'Dashboard',
-        },
-        {
-            path: '',
-            breadcrumbName: `${name}`,
-        },
-    ];
+        setModalVisible(false)
+        setDownloadProgress(0)
+    }
 
     return (
         <>
             <PageHeaders
-                routes={PageRoutes}
-                title={`${name}`}
+                routes={[
+                    { path: 'index', breadcrumbName: 'Dashboard' },
+                    { path: '', breadcrumbName: `${router.query.name}` },
+                ]}
+                title={`${router.query.name}`}
                 className="flex justify-between items-center px-8 xl:px-[15px] pt-[18px] pb-6 sm:pb-[30px] bg-transparent sm:flex-col"
             />
-            <main className="min-h-[715px] lg:min-h-[580px] bg-transparent px-[30px] xl:px-[15px] pb-[25px]">
-                <Row gutter={25} className="mt-sm-10">
-                    <Button
-                        onClick={downloadAllMedia}
-                        type="primary"
-                        style={{ marginBottom: '20px' }}
-                    >
-                        Download All Media
-                    </Button>
-                    {feeds.length > 0 ? (
-                        feeds.map((feed) => (
-                            <Col
-                                key={feed.id}
-                                xxl={6}
-                                xl={8}
-                                sm={12}
-                                xs={24}
-                                className="mb-[25px]"
-                            >
-                                <figure className="group p-6 mb-0 bg-white dark:bg-white/10 rounded-10 shadow-regular dark:shadow-none">
-                                    {feed.mediaType === 8 ? (
-                                        <Carousel autoplay>
-                                            {feed.mediaItems.map((media, index) => (
-                                                <div
-                                                    key={index}
-                                                    className="relative after:absolute after:h-0 w-full ltr:after:left-0 rtl:after:right-0 after:top-0 after:bg-[#0a0a0a15] after:rounded-10 after:transition-all after:duration-300 group-hover:after:h-full"
-                                                >
-                                                    {filterFeeds(media)}
-                                                </div>
-                                            ))}
-                                        </Carousel>
-                                    ) : (
-                                        filterFeeds(feed.mediaItems[0])
-                                    )}
-                                    <p className="mb-4 text-base text-dark dark:text-white/[.87] line-clamp-3">
-                                        {feed.caption}
-                                    </p>
-                                    <div className="flex justify-between">
-                                        <ul className="flex items-center -m-2">
-                                            <li className="m-2">
-                                                <span className="flex items-center leading-none gap-x-1 text-light dark:text-white/60 text-13">
-                                                    <UilHeart className="w-3 h-3 text-light dark:text-white/60" />
-                                                    <span className="flex items-center leading-none text-light dark:text-white/60 text-13">
-                                                        {feed.likeCount}
-                                                    </span>
-                                                </span>
-                                            </li>
-                                            <li className="m-2">
-                                                <span className="flex items-center leading-none gap-x-1 text-light dark:text-white/60 text-13">
-                                                    <UilFile className="w-3 h-3 text-light dark:text-white/60" />
-                                                    <span className="flex items-center leading-none text-light dark:text-white/60 text-13">
-                                                        {feed.commentCount}
-                                                    </span>
-                                                </span>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                </figure>
-                            </Col>
-                        ))
-                    ) : (
-                        <Col span={24} className="text-center">
-                            <p>No feeds available.</p>
-                        </Col>
-                    )}
-                </Row>
-                {!hasMore && (
-                    <div className="flex justify-center">
-                        <p>No more feeds to load.</p>
+
+            <Spin spinning={loading} tip="Loading Feeds...">
+                <main className="min-h-[715px] lg:min-h-[580px] bg-transparent px-[30px] xl:px-[15px] pb-[25px]">
+                    <div className="flex items-center justify-between mb-6 bg-white/90 p-4 rounded-lg shadow">
+                        <Checkbox
+                            checked={allSelected}
+                            onChange={toggleSelectAll}
+                            className="font-medium"
+                        >
+                            Select All
+                        </Checkbox>
+                        <Button type="primary" onClick={downloadAllMedia}>
+                            Download Selected Media
+                        </Button>
                     </div>
-                )}
-                <Modal
-                    title="Downloading Media"
-                    open={modalVisible}
-                    footer={null}
-                    onCancel={() => setModalVisible(false)}
-                >
-                    <Progress percent={downloadProgress} />
-                    <p>Downloaded {downloadProgress}% of {totalFiles} files.</p>
-                </Modal>
-            </main>
+                    <Row gutter={[14, 18]}>
+                        {feeds.map((feed) => (
+                            <Col sm={6} xs={8} span={8} key={feed.id}>
+                                <div className="bg-white rounded-lg shadow-lg p-3 mb-6 transition-all hover:shadow-xl">
+                                    <div className="media-content mb-4">
+                                        {feed.mediaType === 8 ? (
+                                            <Carousel>
+                                                {feed.mediaItems.map(
+                                                    (media, index) => (
+                                                        <div
+                                                            key={index}
+                                                            className="carousel-item"
+                                                        >
+                                                            <Checkbox
+                                                                checked={selectedMedia.has(
+                                                                    `${feed.id}-${media.url}`
+                                                                )}
+                                                                onChange={() =>
+                                                                    toggleSelectMedia(
+                                                                        `${feed.id}-${media.url}`
+                                                                    )
+                                                                }
+                                                                className="mb-2"
+                                                            />
+                                                            {media.mediaType ===
+                                                            'photo' ? (
+                                                                <Image
+                                                                    src={
+                                                                        media.url
+                                                                    }
+                                                                    alt={
+                                                                        media.mediaType
+                                                                    }
+                                                                    width={450}
+                                                                    height={550}
+                                                                    className="rounded w-full"
+                                                                />
+                                                            ) : (
+                                                                <video
+                                                                    controls
+                                                                    className="rounded w-full"
+                                                                >
+                                                                    <source
+                                                                        src={
+                                                                            media.url
+                                                                        }
+                                                                        type="video/mp4"
+                                                                    />
+                                                                </video>
+                                                            )}
+                                                        </div>
+                                                    )
+                                                )}
+                                            </Carousel>
+                                        ) : feed.mediaType === 1 ? (
+                                            <>
+                                                <Checkbox
+                                                    checked={selectedMedia.has(
+                                                        `${feed.id}-${feed.mediaItems[0].url}`
+                                                    )}
+                                                    onChange={() =>
+                                                        toggleSelectMedia(
+                                                            `${feed.id}-${feed.mediaItems[0].url}`
+                                                        )
+                                                    }
+                                                    className="mb-2"
+                                                />
+                                                <Image
+                                                    src={feed.mediaItems[0].url}
+                                                    alt={
+                                                        feed.mediaItems[0]
+                                                            .mediaType
+                                                    }
+                                                    width={250}
+                                                    height={350}
+                                                    className="rounded-md"
+                                                />
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Checkbox
+                                                    checked={selectedMedia.has(
+                                                        `${feed.id}-${feed.mediaItems[0].url}`
+                                                    )}
+                                                    onChange={() =>
+                                                        toggleSelectMedia(
+                                                            `${feed.id}-${feed.mediaItems[0].url}`
+                                                        )
+                                                    }
+                                                    className="mb-2"
+                                                />
+                                                <video
+                                                    controls
+                                                    className="rounded-md"
+                                                >
+                                                    <source
+                                                        src={
+                                                            feed.mediaItems[0]
+                                                                .url
+                                                        }
+                                                        type="video/mp4"
+                                                    />
+                                                </video>
+                                            </>
+                                        )}
+                                    </div>
+                                    <div className="text-start">
+                                        <p className="font-semibold text-gray-700 line-clamp-5">
+                                            {feed.caption}
+                                        </p>
+                                        <div className="flex justify-between items-center mt-4 text-gray-600">
+                                            <span>
+                                                <UilFile className="mr-2" />{' '}
+                                                {feed.commentCount} Comments
+                                            </span>
+                                            <span>
+                                                <UilHeart className="mr-2" />{' '}
+                                                {feed.likeCount} Likes
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </Col>
+                        ))}
+                    </Row>
+                </main>
+            </Spin>
+
+            <Modal
+                open={modalVisible}
+                onCancel={handleModalCancel}
+                footer={null}
+                className="p-4 bg-white shadow-lg rounded-lg w-max"
+            >
+                <div className="p-4">
+                    <Progress
+                        percent={downloadProgress}
+                        status="active"
+                        type="dashboard"
+                        className="m-auto"
+                    />
+                    <p className="mt-4 text-lg text-center">
+                        Mengunduh {downloadProgress}% ({totalFiles} file)
+                    </p>
+                </div>
+            </Modal>
         </>
-    );
+    )
 }
 
-export default BlogTwo;
+export default BlogTwo

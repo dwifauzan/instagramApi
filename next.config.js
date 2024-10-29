@@ -9,7 +9,7 @@ const nextConfig = {
                 basePath: false,
                 permanent: false,
             },
-        ];
+        ]
     },
     reactStrictMode: true,
     images: {
@@ -28,11 +28,6 @@ const nextConfig = {
             },
         ],
     },
-    api: {
-        bodyParser: {
-            sizeLimit: '25mb', // Adjust this limit as needed
-        },
-    },
 }
 
-module.exports = nextConfig;
+module.exports = nextConfig

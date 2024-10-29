@@ -248,31 +248,15 @@ function MenuItems() {
             ),
             null
         ),
-        //backup
-        // getItem(
-        //     <Link href={`${path}/tables/schedule`}>
-        //         {t('Schedule')}
-        //     </Link>,
-        //     'schedule',
-        //     !topMenu && (
-        //         <Link
-        //             className="menuItem-icon"
-        //             href={`${path}/tables/schedule`}
-        //         >
-        //             <UilEdit />
-        //         </Link>
-        //     ),
-        //     null
-        // ),
         getItem(
-            <Link href={`${path}/tables/chooserSchedule`}>
+            <Link href={`${path}/tables/schedule`}>
                 {t('Schedule')}
             </Link>,
             'schedule',
             !topMenu && (
                 <Link
                     className="menuItem-icon"
-                    href={`${path}/tables/chooserSchedule`}
+                    href={`${path}/tables/schedule`}
                 >
                     <UilEdit />
                 </Link>

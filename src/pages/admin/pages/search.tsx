@@ -3,10 +3,10 @@ import Link from 'next/link'
 import { Row, Col, Pagination, AutoComplete, Input, Card, Spin } from 'antd'
 import debounce from 'lodash.debounce'
 import { PageHeaders } from '@/components/page-headers'
-import { jwtDecode } from 'jwt-decode'
 import Image from 'next/image'
 import { useNotification } from '../crud/axios/handler/error' // Import hook
 import { useRouter } from 'next/router'
+import axios from 'axios'
 
 type Users = {
     pk: number
@@ -69,33 +69,16 @@ function SearchResult() {
                 throw new Error('Token tidak ditemukan, harap login kembali.')
             }
 
-            const response = await fetch(
+            const response = await axios.get(
                 `http://192.168.18.45:5000/api/v1/search?q=${query}`,
                 {
-                    method: 'GET',
                     headers: {
                         Authorization: `Bearer ${token}`,
-                        'X-License-Key':
-                            'akrmxgkgfkjarhfakzmgakjherfgkaueygzamkhj',
                     },
                 }
             )
 
-            if (!response.ok) {
-                const message = await response.json()
-                const erro = message.message
-                openNotificationWithIcon('error', 'failed search', erro)
-                openNotificationWithIcon(
-                    'error',
-                    'failed search',
-                    'silahkan logout dan login kembali'
-                )
-                throw new Error(erro)
-            }
-
-            const data = await response.json()
-            console.log(data)
-            processAllSearchData(data.data)
+            processAllSearchData(response.data.data)
         } catch (error: any) {
             // Tangkap dan tampilkan pesan error
             if (error.message.includes('Session expired')) {
@@ -422,7 +405,10 @@ function SearchResult() {
                                                                             }
                                                                         </div>
                                                                     }
-                                                                    description={`Address: ${locations.address || 'lokasi tidak ditemukan'}`}
+                                                                    description={`Address: ${
+                                                                        locations.address ||
+                                                                        'lokasi tidak ditemukan'
+                                                                    }`}
                                                                 />
                                                             </div>
                                                         </Card>

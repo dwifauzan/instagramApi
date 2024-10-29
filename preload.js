@@ -1,7 +1,8 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('electron', {
-    selectDownloadDirectory: () => ipcRenderer.invoke('selectDownloadDirectory'),
-    downloadFile: (url, downloadPath, mediaType, caption) =>
-        ipcRenderer.invoke('downloadFile', url, downloadPath, mediaType, caption),
-});
+    selectDownloadDirectory: () =>
+        ipcRenderer.invoke('selectDownloadDirectory'),
+    startDownload: (url, downloadPath, feed) =>
+        ipcRenderer.invoke('startDownload', url, downloadPath, feed),
+})

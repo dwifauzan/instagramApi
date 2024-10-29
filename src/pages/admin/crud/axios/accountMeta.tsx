@@ -31,6 +31,7 @@ function ViewPage() {
   };
 
   const handleFinish = async (values: any) => {
+    console.log('Form submitted with values:', values); // Debug log
     setFormLoading(true);
     try {
       const response = await fetch('/hexadash-nextjs/api/logFacebook', {
@@ -141,7 +142,7 @@ function ViewPage() {
 
           {selectedAccountId && (
             <Button
-              type="primary"
+              type="danger"
               onClick={handleDeleteAccount}
               icon={<DeleteOutlined />}
               style={{ marginBottom: '16px' }}
@@ -172,11 +173,11 @@ function ViewPage() {
                 <Input placeholder="Enter your account name" />
               </Form.Item>
               <Form.Item
-                name="password"
-                label="password"
-                rules={[{ required: true, message: 'Please input your password!' }]}
+                name="email"
+                label="Email"
+                rules={[{ required: true, message: 'Please input your email!' }]}
               >
-                <Input type="password" placeholder="Enter your password" />
+                <Input type="email" placeholder="Enter your email" />
               </Form.Item>
               <Form.Item>
                 <Button
