@@ -1,13 +1,14 @@
-// main.js
 const { app, BrowserWindow, ipcMain, dialog } = require('electron')
 const path = require('path')
 const fs = require('fs-extra')
 const axios = require('axios')
 const { createWriteStream } = require('fs')
 const { join } = require('path')
+const { PrismaClient } = require('@prisma/client')
+
+const prisma = new PrismaClient()
 
 let mainWindow
-
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -48,80 +49,132 @@ app.on('window-all-closed', () => {
     }
 })
 
-ipcMain.handle('selectDownloadDirectory', async () => {
-    const result = await dialog.showOpenDialog({
-        properties: ['openDirectory'],
+ipcMain.handle('startDownload', async (_, nameArsip, feed, signal) => {
+    console.log('Received nameArsip:', nameArsip)
+
+    if (signal.aborted) {
+        throw new Error('Download aborted')
+    }
+
+    if (!nameArsip) {
+        console.error('nameArsip is empty')
+        return
+    }
+
+    // Path folder tempat arsip disimpan
+    const folderPath = join(
+        `${__dirname}/arsip/${nameArsip}`,
+        feed.id.toString()
+    )
+    console.log('Folder Path:', folderPath)
+    await fs.mkdir(folderPath, { recursive: true }).catch((err) => {
+        console.error('Error creating folder:', err)
     })
-    return result.filePaths[0]
+
+    try {
+        // Cari atau buat Arsip
+        let arsip = await prisma.arsip.findUnique({
+            where: { nama_arsip: nameArsip },
+        })
+        if (!arsip) {
+            arsip = await prisma.arsip.create({
+                data: { nama_arsip: nameArsip },
+            })
+        }
+
+        // Cari atau buat FolderArsip
+        let folderArsip = await prisma.folderArsip.findFirst({
+            where: {
+                caption: feed.caption,
+                arsipId: arsip.id,
+            },
+        })
+        if (!folderArsip) {
+            folderArsip = await prisma.folderArsip.create({
+                data: {
+                    caption: feed.caption,
+                    like: feed.likeCount,
+                    coment: feed.commentCount,
+                    arsipId: arsip.id,
+                },
+            })
+        }
+
+        // Download setiap media item dalam feed dan simpan di DetailContent
+        for (let index = 0; index < feed.mediaItems.length; index++) {
+            const mediaItem = feed.mediaItems[index]
+
+            await downloadFile(
+                mediaItem.url,
+                folderPath,
+                mediaItem.mediaType,
+                mediaItem.mediaType === 'photo' ? 1 : 2, // Sesuaikan media_type
+                folderArsip.id,
+                index,
+                feed.mediaType === 8
+            )
+        }
+    } catch (error) {
+        console.error('Download or database error:', error)
+    }
 })
 
 const downloadFile = async (
     url,
     folderPath,
     mediaType,
-    caption,
-    mainWindow,
+    type,
+    arsipId,
     index = 0,
     isCarousel = false
 ) => {
     const response = await axios.get(url, { responseType: 'stream' })
-
     const fileExtension =
         mediaType === 'photo' ? '.jpg' : mediaType === 'video' ? '.mp4' : ''
-    const fileName = isCarousel
-        ? `untitled-${index + 1}${fileExtension}`
-        : `untitled${fileExtension}`
+    const fileName = `untitled${
+        isCarousel ? `-${index + 1}` : ''
+    }${fileExtension}`
     const filePath = join(folderPath, fileName)
-    const captionPath = join(folderPath, 'caption.txt')
-
-    const total = parseInt(response.headers['content-length'], 10)
-    let downloaded = 0
-
-    response.data.on('data', (chunk) => {
-        downloaded += chunk.length
-        const progress = Math.round((downloaded / total) * 100)
-        mainWindow.webContents.send('download-progress', { url, progress })
-    })
 
     const writer = createWriteStream(filePath)
     response.data.pipe(writer)
 
     return new Promise((resolve, reject) => {
         writer.on('finish', async () => {
-            await fs.writeFile(captionPath, caption, 'utf-8')
-            resolve()
+            try {
+                // Cek apakah sudah ada DetailContent untuk arsip ini
+                const existingDetail = await prisma.detailContent.findUnique({
+                    where: { folderArsipId: arsipId },
+                })
+
+                // Buat hanya jika tidak ada entry sebelumnya
+                if (!existingDetail) {
+                    await prisma.detailContent.create({
+                        data: {
+                            file_path: filePath,
+                            media_type: type,
+                            folderArsipId: arsipId,
+                        },
+                    })
+                }
+                resolve()
+            } catch (error) {
+                reject(error)
+            }
         })
         writer.on('error', reject)
     })
 }
 
-// Ganti fungsi ini untuk menggunakan feedsData
-ipcMain.handle('startDownload', async (_, directory, feed) => {
-    const mediaItems = feed.mediaItems
-    const folderName = feed.id // Gunakan ID sebagai nama folder
-    const folderPath = join(directory, folderName)
-    await fs.mkdir(folderPath, { recursive: true })
-
-    if (feed.mediaType === 8) {
-        for (let index = 0; index < mediaItems.length; index++) {
-            const mediaItem = mediaItems[index]
-            await downloadFile(
-                mediaItem.url,
-                folderPath,
-                mediaItem.mediaType,
-                feed.caption,
-                mainWindow,
-                index,
-                true
-            )
-        }
-    } else {
-        await downloadFile(
-            mediaItems[0].url,
-            folderPath,
-            mediaItems[0].mediaType,
-            feed.caption,
-            mainWindow
-        )
-    }
+ipcMain.handle('getFeedData', async () => {
+    const arsip = await prisma.arsip.findMany({
+        include: {
+            folder_arsip: {
+                include: {
+                    detail_content: true,
+                },
+            },
+        },
+    })
+    return arsip
 })

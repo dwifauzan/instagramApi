@@ -41,6 +41,8 @@ function BlogFour() {
     const [modalVisible, setModalVisible] = useState(false)
     const [downloadProgress, setDownloadProgress] = useState(0)
     const [totalFiles, setTotalFiles] = useState(0)
+    const [nameArsip, setNameArsip] = useState('')
+    const [modalVisibleArsip, setModalVisibleArsip] = useState(false)
     const { openNotificationWithIcon } = useNotification()
     const abortController = useRef<AbortController | null>(null)
 
@@ -94,9 +96,7 @@ function BlogFour() {
 
     const handleModalCancel = () => {
         setModalVisible(false)
-        if (abortController.current) {
-            abortController.current.abort()
-        }
+        abortController.current?.abort()
         setDownloadProgress(0)
     }
 
@@ -127,14 +127,9 @@ function BlogFour() {
     }
 
     const downloadAllMedia = async () => {
-        const downloadPath = await (
-            window as any
-        ).electron.selectDownloadDirectory()
-        if (!downloadPath) return
-
         setModalVisible(true)
         setDownloadProgress(0)
-
+        // Melakukan set feeds yang dipilih berdasarkan checkbox
         const selectedFeeds = feeds.map((feed) => ({
             ...feed,
             mediaItems: feed.mediaItems.filter((media) =>
@@ -156,29 +151,19 @@ function BlogFour() {
             for (const feed of selectedFeeds) {
                 if (feed.mediaItems.length === 0) continue
                 await (window as any).electron.startDownload(
-                    downloadPath,
+                    nameArsip,
                     feed,
                     signal
                 )
                 downloadedFiles += feed.mediaItems.length
                 setDownloadProgress(Math.round((downloadedFiles / total) * 100))
-
                 if (signal.aborted) break
             }
         } catch (err: any) {
-            if (signal.aborted) {
-                openNotificationWithIcon(
-                    'error',
-                    'Download Cancelled',
-                    'Proses download telah dibatalkan'
-                )
-            } else {
-                openNotificationWithIcon(
-                    'error',
-                    'Download failed',
-                    `${err.message}`
-                )
-            }
+            const message = signal.aborted
+                ? 'Proses download telah dibatalkan'
+                : `${err.message}`
+            openNotificationWithIcon('error', 'Download failed', message)
         }
 
         setModalVisible(false)
@@ -206,8 +191,11 @@ function BlogFour() {
                         >
                             Select All
                         </Checkbox>
-                        <Button type="primary" onClick={downloadAllMedia}>
-                            Download Selected Media
+                        <Button
+                            type="primary"
+                            onClick={() => setModalVisibleArsip(true)}
+                        >
+                            Download Media
                         </Button>
                     </div>
                     <Row gutter={[14, 18]}>
@@ -337,6 +325,69 @@ function BlogFour() {
                     </Row>
                 </main>
             </Spin>
+
+            <div
+                className={`fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 ${
+                    modalVisibleArsip ? 'block' : 'hidden'
+                }`}
+                style={{ zIndex: 1000 }}
+                aria-labelledby="arsip-modal-title"
+                aria-describedby="arsip-modal-description"
+            >
+                <div
+                    className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md mx-4"
+                    style={{ position: 'relative' }}
+                >
+                    {/* Title */}
+                    <h2
+                        id="arsip-modal-title"
+                        className="text-lg font-semibold mb-4 text-center"
+                    >
+                        Tambah Arsip Baru
+                    </h2>
+
+                    {/* Description */}
+                    <p
+                        id="arsip-modal-description"
+                        className="text-gray-600 text-sm text-center mb-4"
+                    >
+                        Masukkan nama arsip baru yang ingin ditambahkan
+                    </p>
+
+                    {/* Input Field */}
+                    <input
+                        type="text"
+                        placeholder="Nama Arsip"
+                        value={nameArsip}
+                        onChange={(e) => setNameArsip(e.target.value)}
+                        className="w-full h-10 px-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+
+                    {/* Buttons */}
+                    <div className="flex justify-end gap-2">
+                        <button
+                            onClick={() => setModalVisibleArsip(false)}
+                            className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            onClick={() => {
+                                setModalVisibleArsip(false)
+                                downloadAllMedia()
+                            }}
+                            className={`px-4 py-2 text-white rounded-md ${
+                                nameArsip.trim()
+                                    ? 'bg-blue-500 hover:bg-blue-600'
+                                    : 'bg-blue-300'
+                            }`}
+                            disabled={!nameArsip.trim()}
+                        >
+                            Simpan
+                        </button>
+                    </div>
+                </div>
+            </div>
 
             <Modal
                 open={modalVisible}

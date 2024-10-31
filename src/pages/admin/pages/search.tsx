@@ -71,6 +71,7 @@ function SearchResult() {
 
             const response = await axios.get(
                 `http://192.168.18.45:5000/api/v1/search?q=${query}`,
+                // `/hexadash-nextjs/searchDataDummy.json`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
