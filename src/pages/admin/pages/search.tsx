@@ -356,7 +356,7 @@ function SearchResult() {
                                                                         width="50"
                                                                         height="50"
                                                                         className="rounded-full"
-                                                                        src="https://img.freepik.com/free-vector/users-with-hashtag-vector_53876-77990.jpg?t=st=1727338307~exp=1727341907~hmac=86afcadc0c7fc09082f1e9afee7bd097b9e8d197e9daa95093235568731706ed&w=826"
+                                                                        src="/hexadash-nextjs/hastag.jpg"
                                                                         alt="location image"
                                                                     />
                                                                     <Card.Meta
@@ -395,7 +395,7 @@ function SearchResult() {
                                                                     width={50}
                                                                     height={50}
                                                                     className="rounded-full"
-                                                                    src="https://img.freepik.com/free-vector/location-pin_78370-525.jpg?t=st=1727338255~exp=1727341855~hmac=8e2deda59f1b78a195fddc626ea48ac8100dcca996010a391f2f3334aa160b34&w=826"
+                                                                    src="/hexadash-nextjs/locate.jpg"
                                                                     alt="location image"
                                                                 />
                                                                 <Card.Meta

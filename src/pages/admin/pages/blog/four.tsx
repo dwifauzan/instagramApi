@@ -7,14 +7,17 @@ import {
     Progress,
     Row,
     Spin,
+    Select,
 } from 'antd'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import Image from 'next/image'
 import { UilFile, UilHeart } from '@iconscout/react-unicons'
 import { PageHeaders } from '@/components/page-headers'
 import { useNotification } from '../../crud/axios/handler/error'
 import axios from 'axios'
+
+const { Option } = Select
 
 interface MediaItem {
     mediaType: string
@@ -43,6 +46,9 @@ function BlogFour() {
     const [totalFiles, setTotalFiles] = useState(0)
     const [nameArsip, setNameArsip] = useState('')
     const [modalVisibleArsip, setModalVisibleArsip] = useState(false)
+    const [sortCriteria, setSortCriteria] = useState<
+        'likes' | 'comments' | 'recent' | 'oldest' | 'trending'
+    >('likes')
     const { openNotificationWithIcon } = useNotification()
     const abortController = useRef<AbortController | null>(null)
 
@@ -93,6 +99,36 @@ function BlogFour() {
         }
         setLoading(false)
     }
+
+    const sortedFeeds = useMemo(() => {
+        return feeds.sort((a, b) => {
+            switch (sortCriteria) {
+                case 'likes':
+                    return b.likeCount - a.likeCount // Mengurutkan berdasarkan jumlah like terbanyak
+                case 'comments':
+                    return b.commentCount - a.commentCount // Mengurutkan berdasarkan jumlah komentar terbanyak
+                case 'recent':
+                    return (
+                        new Date(b.takenAt).getTime() -
+                        new Date(a.takenAt).getTime()
+                    ) // Mengurutkan berdasarkan postingan terbaru
+                case 'oldest':
+                    return (
+                        new Date(a.takenAt).getTime() -
+                        new Date(b.takenAt).getTime()
+                    )
+                case 'trending':
+                    // Misalnya, gunakan kombinasi like dan comment
+                    return (
+                        b.likeCount +
+                        b.commentCount -
+                        (a.likeCount + a.commentCount)
+                    )
+                default:
+                    return 0 // Tidak ada perubahan urutan
+            }
+        })
+    }, [feeds, sortCriteria])
 
     const handleModalCancel = () => {
         setModalVisible(false)
@@ -191,15 +227,28 @@ function BlogFour() {
                         >
                             Select All
                         </Checkbox>
-                        <Button
-                            type="primary"
-                            onClick={() => setModalVisibleArsip(true)}
-                        >
-                            Download Media
-                        </Button>
+                        <div className="flex items-center gap-x-4">
+                            <Select
+                                defaultValue={sortCriteria}
+                                onChange={(value) => setSortCriteria(value)}
+                                style={{ marginBottom: '16px' }}
+                            >
+                                <Option value="likes">Most Liked</Option>
+                                <Option value="comments">Most Commented</Option>
+                                <Option value="recent">Most Recent</Option>
+                                <Option value="oldest">Most OldDet</Option>
+                                <Option value="trending">Trending</Option>
+                            </Select>
+                            <Button
+                                type="primary"
+                                onClick={() => setModalVisibleArsip(true)}
+                            >
+                                Download Media
+                            </Button>
+                        </div>
                     </div>
                     <Row gutter={[14, 18]}>
-                        {feeds.map((feed) => (
+                        {sortedFeeds.map((feed) => (
                             <Col sm={6} xs={8} span={8} key={feed.id}>
                                 <div className="bg-white rounded-lg shadow-lg p-3 mb-6 transition-all hover:shadow-xl">
                                     <div className="media-content mb-4">
