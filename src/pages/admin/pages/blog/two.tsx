@@ -12,7 +12,7 @@ import {
 import { useEffect, useState, useRef, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import Image from 'next/image'
-import { UilFile, UilHeart } from '@iconscout/react-unicons'
+import { UilFile, UilHeart, UilRepeat } from '@iconscout/react-unicons'
 import { PageHeaders } from '@/components/page-headers'
 import { useNotification } from '../../crud/axios/handler/error'
 import axios from 'axios'
@@ -46,11 +46,11 @@ function BlogTwo() {
     const [totalFiles, setTotalFiles] = useState(0)
     const [nameArsip, setNameArsip] = useState('')
     const [modalVisibleArsip, setModalVisibleArsip] = useState(false)
+    const { openNotificationWithIcon } = useNotification()
+    const abortController = useRef<AbortController | null>(null)
     const [sortCriteria, setSortCriteria] = useState<
         'likes' | 'comments' | 'recent' | 'oldest' | 'trending'
     >('likes')
-    const { openNotificationWithIcon } = useNotification()
-    const abortController = useRef<AbortController | null>(null)
 
     useEffect(() => {
         if (router.query.name) {
@@ -62,7 +62,7 @@ function BlogTwo() {
         if (loading) return
         setLoading(true)
         try {
-            const token = sessionStorage.getItem(sessionStorage.key(0)!)
+            const token = localStorage.getItem(localStorage.key(0)!)
             if (!token) {
                 openNotificationWithIcon(
                     'error',
@@ -95,36 +95,6 @@ function BlogTwo() {
         }
         setLoading(false)
     }
-
-    const sortedFeeds = useMemo(() => {
-        return feeds.sort((a, b) => {
-            switch (sortCriteria) {
-                case 'likes':
-                    return b.likeCount - a.likeCount // Mengurutkan berdasarkan jumlah like terbanyak
-                case 'comments':
-                    return b.commentCount - a.commentCount // Mengurutkan berdasarkan jumlah komentar terbanyak
-                case 'recent':
-                    return (
-                        new Date(b.takenAt).getTime() -
-                        new Date(a.takenAt).getTime()
-                    ) // Mengurutkan berdasarkan postingan terbaru
-                case 'oldest':
-                    return (
-                        new Date(a.takenAt).getTime() -
-                        new Date(b.takenAt).getTime()
-                    )
-                case 'trending':
-                    // Misalnya, gunakan kombinasi like dan comment
-                    return (
-                        b.likeCount +
-                        b.commentCount -
-                        (a.likeCount + a.commentCount)
-                    )
-                default:
-                    return 0 // Tidak ada perubahan urutan
-            }
-        })
-    }, [feeds, sortCriteria])
 
     const handleModalCancel = () => {
         setModalVisible(false)
@@ -198,8 +168,61 @@ function BlogTwo() {
 
         setModalVisible(false)
         setDownloadProgress(0)
+    } 
+
+    const handlerRepost = async (feed: Feed) => {
+        try{
+            const path = '/admin'
+            const sendThis = {
+                url: feed.mediaItems.map(media => media.url),
+                caption: feed.caption
+            }
+
+            console.log(sendThis)
+
+            const response = await axios.post('/hexadash-nextjs/api/repostLoad', sendThis)
+            if(!response){
+                openNotificationWithIcon('error', 'Repost failed', 'Failed to send data to repost endpoint')
+            }
+            openNotificationWithIcon('success', 'repost success', 'success send api')
+            setTimeout(() => {
+                router.push(`${path}/tables/repost`)
+            }, 1000);
+        }catch(err: any){
+            console.log(err)
+            openNotificationWithIcon('error', 'Repost failed', err)
+        }
     }
 
+    const sortedFeeds = useMemo(() => {
+        return feeds.sort((a, b) => {
+            switch (sortCriteria) {
+                case 'likes':
+                    return b.likeCount - a.likeCount // Mengurutkan berdasarkan jumlah like terbanyak
+                case 'comments':
+                    return b.commentCount - a.commentCount // Mengurutkan berdasarkan jumlah komentar terbanyak
+                case 'recent':
+                    return (
+                        new Date(b.takenAt).getTime() -
+                        new Date(a.takenAt).getTime()
+                    ) // Mengurutkan berdasarkan postingan terbaru
+                case 'oldest':
+                    return (
+                        new Date(a.takenAt).getTime() -
+                        new Date(b.takenAt).getTime()
+                    )
+                case 'trending':
+                    // Misalnya, gunakan kombinasi like dan comment
+                    return (
+                        b.likeCount +
+                        b.commentCount -
+                        (a.likeCount + a.commentCount)
+                    )
+                default:
+                    return 0 // Tidak ada perubahan urutan
+            }
+        })
+    }, [feeds, sortCriteria])
     return (
         <>
             <PageHeaders
@@ -221,8 +244,7 @@ function BlogTwo() {
                         >
                             Select All
                         </Checkbox>
-                        <div className="flex items-center gap-x-4">
-                            <Select
+                        <Select
                                 defaultValue={sortCriteria}
                                 onChange={(value) => setSortCriteria(value)}
                                 style={{ marginBottom: '16px' }}
@@ -233,16 +255,15 @@ function BlogTwo() {
                                 <Option value="oldest">Most OldDet</Option>
                                 <Option value="trending">Trending</Option>
                             </Select>
-                            <Button
-                                type="primary"
-                                onClick={() => setModalVisibleArsip(true)}
-                            >
-                                Download Media
-                            </Button>
-                        </div>
+                        <Button
+                            type="primary"
+                            onClick={() => setModalVisibleArsip(true)}
+                        >
+                            Download Media
+                        </Button>
                     </div>
                     <Row gutter={[14, 18]}>
-                        {sortedFeeds.map((feed) => (
+                        {feeds.map((feed) => (
                             <Col sm={6} xs={8} span={8} key={feed.id}>
                                 <div
                                     onClick={() =>
@@ -372,6 +393,9 @@ function BlogTwo() {
                                                 <UilHeart className="mr-2" />{' '}
                                                 {feed.likeCount} Likes
                                             </span>
+                                            <Button className='cursor-pointer' onClick={() => handlerRepost(feed)}>
+                                                    <UilRepeat className="mr-2" /> Repost
+                                            </Button>
                                         </div>
                                     </div>
                                 </div>

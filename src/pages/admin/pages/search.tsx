@@ -56,8 +56,8 @@ function SearchResult() {
     const fetchFeeds = useCallback(async (query: string) => {
         setLoading(true)
         try {
-            console.log(sessionStorage.key(0))
-            const token = sessionStorage.getItem(sessionStorage.key(0)!)
+            console.log(localStorage.key(0))
+            const token = localStorage.getItem(localStorage.key(0)!)
 
             if (!token) {
                 // Jika token tidak ditemukan, lemparkan error
@@ -71,7 +71,6 @@ function SearchResult() {
 
             const response = await axios.get(
                 `http://192.168.18.45:5000/api/v1/search?q=${query}`,
-                // `/hexadash-nextjs/searchDataDummy.json`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -83,7 +82,7 @@ function SearchResult() {
         } catch (error: any) {
             // Tangkap dan tampilkan pesan error
             if (error.message.includes('Session expired')) {
-                sessionStorage.setItem(sessionStorage.key(0)!, 'expired')
+                localStorage.setItem(localStorage.key(1)!, 'expired')
             }
             setError(error.message || 'Error, cobalah reload halaman ini')
         } finally {
@@ -274,7 +273,7 @@ function SearchResult() {
                                                                             width="50"
                                                                             height="50"
                                                                             className="rounded-full"
-                                                                            src="https://img.freepik.com/free-vector/users-with-hashtag-vector_53876-77990.jpg?t=st=1727338307~exp=1727341907~hmac=86afcadc0c7fc09082f1e9afee7bd097b9e8d197e9daa95093235568731706ed&w=826"
+                                                                            src="/hexadash-nextjs/locate.jpg"
                                                                             alt="location image"
                                                                         />
                                                                         <Card.Meta
@@ -312,7 +311,7 @@ function SearchResult() {
                                                                                 50
                                                                             }
                                                                             className="rounded-full"
-                                                                            src="https://img.freepik.com/free-vector/location-pin_78370-525.jpg?t=st=1727338255~exp=1727341855~hmac=8e2deda59f1b78a195fddc626ea48ac8100dcca996010a391f2f3334aa160b34&w=826"
+                                                                            src="/hexadash-nextjs/hastag.jpg"
                                                                             alt="location image"
                                                                         />
                                                                         <Card.Meta
@@ -394,8 +393,7 @@ function SearchResult() {
                                                                 <img
                                                                     width={50}
                                                                     height={50}
-                                                                    className="rounded-full"
-                                                                    src="/hexadash-nextjs/locate.jpg"
+                                                                    className="/hexadash-nextjs/locate.jpg"
                                                                     alt="location image"
                                                                 />
                                                                 <Card.Meta

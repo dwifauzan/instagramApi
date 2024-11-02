@@ -67,7 +67,7 @@ function ViewPage() {
 
     useEffect(() => {
         const loggedIn: any = dataSource.map((user) => {
-            const userToken = sessionStorage.getItem(user.name)
+            const userToken = localStorage.getItem(user.name)
             if (userToken === 'expired') {
                 return { name: 'expired' }
             } else {
@@ -100,7 +100,7 @@ function ViewPage() {
     const handleLogout = async (record: string) => {
         try {
             if (record) {
-                sessionStorage.removeItem(record) // Hapus token dari sessionStorage
+                localStorage.removeItem(record) // Hapus token dari sessionStorage
                 setLoggedInUsers((prevUsers) =>
                     prevUsers.filter((user) => user.name !== record)
                 ) // Perbarui daftar logged-in users
@@ -158,8 +158,8 @@ function ViewPage() {
             }
 
             const data = await response.json()
-            sessionStorage.setItem(data.currentUser, data.token)
-            const tokenDecode = sessionStorage.getItem(data.name)
+            localStorage.setItem(data.currentUser, data.token)
+            const tokenDecode = localStorage.getItem(data.name)
             if (tokenDecode) {
                 const jwtSave: { username: string } = jwtDecode(tokenDecode)
                 setCurrentUser(jwtSave.username)
@@ -198,7 +198,7 @@ function ViewPage() {
     //handle delete session pada database
     const handleDeleteSessio = async (record: DataSource) => {
         try {
-            const token = sessionStorage.getItem(record.name)
+            const token = localStorage.getItem(record.name)
             console.log(record.name)
             // const sessioToken = sessionStorage.getItem()
             const send = await fetch(
@@ -219,7 +219,7 @@ function ViewPage() {
                 'berhasil menghapus session'
             )
             setTimeout(() => {
-                sessionStorage.removeItem(record.name)
+                localStorage.removeItem(record.name)
                 router.reload()
             }, 2000)
         } catch (err) {

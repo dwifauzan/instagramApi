@@ -15,7 +15,7 @@ export const triggerLoginWithPuppeteer = async (formData: any) => {
   });
   const page = await browser.newPage();
   let message = ''
-  let expired_at = '891271'
+  let expired_at = "3265372"
 
   try {
     await page.goto("https://www.facebook.com/", { waitUntil: "networkidle2" });
@@ -33,9 +33,8 @@ export const triggerLoginWithPuppeteer = async (formData: any) => {
     await new Promise(r => setTimeout(r, 2000));
     await page.click(selectorLogin.submit);
 
-    const cookies = await page.cookies();
-
     await page.waitForNavigation({ waitUntil: "networkidle2" });
+    const cookies = await page.cookies();
 
     // Setelah login, mengakses halaman composer di Meta Business Suite
     await page.goto("https://business.facebook.com/latest/composer", { waitUntil: "networkidle2" });

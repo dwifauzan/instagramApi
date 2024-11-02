@@ -1,6 +1,7 @@
 import '@/styles/globals.css'; // Pastikan ini ada di atas
 import { useRouter } from 'next/router'
 import type { AppProps } from 'next/app'
+import {DataProvider} from '@/components/table/detailProvider'
 
 import { Provider } from 'react-redux'
 import { UserProvider } from '@auth0/nextjs-auth0/client'
@@ -17,7 +18,9 @@ function App({ Component, pageProps }: AppProps) {
                <UserProvider profileUrl="/hexadash-nextjs/api/auth/me">
                     <AuthContextProvider>
                         <AdminLayout>
-                            <Component {...pageProps} />
+                            <DataProvider>
+                                <Component {...pageProps} />
+                            </DataProvider>
                         </AdminLayout>
                     </AuthContextProvider>
                 </UserProvider>

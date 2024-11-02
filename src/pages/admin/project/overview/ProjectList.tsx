@@ -16,41 +16,15 @@ import {
     Input,
     Select,
 } from 'antd'
-import Heading from '@/components/heading'
 import DropDown from '@/components/dropdown'
 import { UploadOutlined } from '@ant-design/icons'
-
-const moreContent = (onDelete) => [
-    {
-        key: '1',
-        label: (
-            <Link
-                className="flex items-center text-theme-gray dark:text-white/60 hover:bg-primary-transparent hover:text-primary dark:hover:bg-white/10 px-3 py-1.5 text-sm active"
-                href="#"
-            >
-                Detail
-            </Link>
-        ),
-    },
-    {
-        key: '2',
-        label: (
-            <span
-                className="flex items-center text-theme-gray dark:text-white/60 hover:bg-primary-transparent hover:text-primary dark:hover:bg-white/10 px-3 py-1.5 text-sm active cursor-pointer"
-                onClick={onDelete}
-            >
-                Delete
-            </span>
-        ),
-    },
-]
+import { useRouter } from 'next/router'
+import { useData } from '@/components/table/detailProvider'
 
 interface Project {
     id: number
-    title: string
-    status: string
-    category: string
-    percentage: number
+    nama_arsip: string
+    created_at: any
 }
 
 interface RootState {
@@ -60,35 +34,67 @@ interface RootState {
 }
 
 function ProjectList() {
-    const project = useSelector((state: RootState) => state.projects.data)
-    const [state, setState] = useState({
-        projects: project,
-        current: 0,
-        pageSize: 0,
-    })
-    const { projects } = state
-
-    const [isUploadModalVisible, setIsUploadModalVisible] = useState(false)
+    const router = useRouter()
+    const path = '/admin'
+    const [projects, setProjects] = useState<Project[]>([])
     const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false)
-    const [deleteProjectId, setDeleteProjectId] = useState(null)
-    const [form] = Form.useForm()
+    const [deleteProjectId, setDeleteProjectId] = useState<number | null>(null)
+    const [state, setState] = useState({
+        current: 1,
+        pageSize: 10,
+    })
 
-    const showUploadModal = () => {
-        setIsUploadModalVisible(true)
+    const {setData} = useData() 
+
+    useEffect(() => {
+        const getArsip = async () => {
+            const response = await (window as any).electron.getFeedData()
+            console.log(response)
+            setProjects(response)
+        }
+        getArsip()
+    }, [])
+
+    const lala = (index: number) => {
+        setData(projects[index])
+        router.push({ pathname: `${path}/project/detailArsip/detail`})
     }
 
-    const handleUploadOk = () => {
-        form.submit()
-        setIsUploadModalVisible(false)
-    }
-
-    const handleUploadCancel = () => {
-        setIsUploadModalVisible(false)
-    }
-
-    const handleFormSubmit = (values: any) => {
-        console.log('Form values:', values)
-    }
+    const moreContent = (index: number,onDelete: () => void) => [
+        {
+            key: '1',
+            label: (
+                <Link
+                    className="flex items-center text-theme-gray dark:text-white/60 hover:bg-gray-200 hover:text-primary dark:hover:bg-gray-700 px-3 py-1.5 text-sm active"
+                    href="#"
+                >
+                    Schedule
+                </Link>
+            ),
+        },
+        {
+            key: '2',
+            label: (
+                <span
+                    className="flex items-center text-theme-gray dark:text-white/60 hover:bg-gray-200 hover:text-primary dark:hover:bg-gray-700 px-3 py-1.5 text-sm active cursor-pointer"
+                    onClick={() => lala(index)}
+                >
+                    Detail
+                </span>
+            ),
+        },
+        {
+            key: '3',
+            label: (
+                <span
+                    className="flex items-center text-theme-gray dark:text-white/60 hover:bg-red-100 hover:text-red-500 dark:hover:bg-red-700 px-3 py-1.5 text-sm active cursor-pointer"
+                    onClick={onDelete}
+                >
+                    Delete
+                </span>
+            ),
+        },
+    ]
 
     const showDeleteConfirm = (id: number) => {
         setDeleteProjectId(id)
@@ -96,7 +102,6 @@ function ProjectList() {
     }
 
     const confirmDelete = () => {
-        // Add your delete logic here using deleteProjectId
         console.log(`Project with id ${deleteProjectId} deleted`)
         setDeleteProjectId(null)
         setIsDeleteModalVisible(false)
@@ -107,113 +112,54 @@ function ProjectList() {
         setIsDeleteModalVisible(false)
     }
 
-    useEffect(() => {
-        if (project) {
-            setState((prevState) => ({
-                ...prevState,
-                projects: project,
-            }))
-        }
-    }, [project])
-
     const onShowSizeChange = (current: number, pageSize: number) => {
         setState({ ...state, current, pageSize })
     }
 
-    const onHandleChange = (current: number, pageSize: number) => {
-        setState({ ...state, current, pageSize })
+    const onHandleChange = (current: number) => {
+        setState({ ...state, current })
     }
 
-    const dataSource: any[] = []
-
-    if (projects.length) {
-        projects.map((value: Project) => {
-            const { id, title, status, category, percentage } = value
-            return dataSource.push({
-                key: id,
-                startDate: (
-                    <span className="text-body dark:text-white/60 text-[15px] font-medium">
-                        26 Dec 2019
-                    </span>
-                ),
-                deadline: (
-                    <span className="text-body dark:text-white/60 text-[15px] font-medium">
-                        18 Mar 2020
-                    </span>
-                ),
-                assigned: (
-                    <ul className="flex items-center -m-[3px] p-0 gap-[3px]">
-                        <li>
-                            <span>Account a</span>
-                        </li>
-                        <li>
-                            <span>Account b</span>
-                        </li>
-                        <li>
-                            <span>Account c</span>
-                        </li>
-                        <li>
-                            <span>Account d</span>
-                        </li>
-                    </ul>
-                ),
-                status: (
-                    <Tag
-                        className={`inline-flex items-center justify-center text-white min-h-[18px] px-3 text-[10px] uppercase font-semibold border-none rounded-1 ${
-                            status === 'complete'
-                                ? 'bg-green-500'
-                                : 'bg-red-500'
-                        }`}
-                    >
-                        {status === 'complete' ? 'Complete' : 'Progress'}
-                    </Tag>
-                ),
-                completion: (
-                    <Progress
-                        percent={status === 'complete' ? 100 : percentage}
-                        size="small"
-                        className="inline-flex items-center text-sm text-body dark:text-white/60"
-                    />
-                ),
-                action: (
-                    <DropDown
-                        className="min-w-[140px]"
-                        customContent={moreContent(() => showDeleteConfirm(id))}
-                    >
-                        <Link href="#">
-                            <UilEllipsisH className="w-4 h-4 text-light-extra dark:text-white/60" />
-                        </Link>
-                    </DropDown>
-                ),
-            })
-        })
-    }
+    const dataSource = projects.map((project, index) => ({
+        key: project.id,
+        no: index + 1,
+        nama_arsip: (
+            <span className="text-body dark:text-white/60 text-[15px] font-medium">
+                {project.nama_arsip}
+            </span>
+        ),
+        created_at: (
+            <span className="text-body dark:text-white/60 text-[15px] font-medium">
+                {new Date(project.created_at).toLocaleDateString()}
+            </span>
+        ),
+        action: (
+            <DropDown
+                className="min-w-[140px] hover:bg-gray-100 dark:hover:bg-gray-800"
+                customContent={moreContent(index, () => showDeleteConfirm(project.id))}
+            >
+                <Link href="#">
+                    <UilEllipsisH className="w-4 h-4 text-light-extra dark:text-white/60 hover:text-primary" />
+                </Link>
+            </DropDown>
+        ),
+    }))
 
     const columns = [
         {
-            title: 'Start Date',
-            dataIndex: 'startDate',
-            key: 'startDate',
+            title: 'No',
+            dataIndex: 'no',
+            key: 'no',
         },
         {
-            title: 'Deadline',
-            dataIndex: 'deadline',
-            key: 'deadline',
+            title: 'Nama Arsip',
+            dataIndex: 'nama_arsip',
+            key: 'nama_arsip',
         },
         {
-            title: 'Target Account',
-            dataIndex: 'assigned',
-            key: 'assigned',
-        },
-        {
-            title: 'Status',
-            dataIndex: 'status',
-            key: 'status',
-        },
-        {
-            title: 'Progress',
-            dataIndex: 'completion',
-            key: 'completion',
+            title: 'Created at',
+            dataIndex: 'created_at',
+            key: 'created_at',
         },
         {
             title: 'Actions',
@@ -225,15 +171,6 @@ function ProjectList() {
     return (
         <>
             <Row gutter={25}>
-                {/* <Col xs={24}>
-                    <Button
-                        className="mx-5 mt-4 px-5 py-2"
-                        type="primary"
-                        onClick={showUploadModal}
-                    >
-                        Upload Media
-                    </Button>
-                </Col> */}
                 <Col xs={24}>
                     <div className="bg-white dark:bg-[#202531] pt-[25px] px-[25px] rounded-[10px]">
                         <div className="table-responsive">
@@ -241,6 +178,7 @@ function ProjectList() {
                                 pagination={false}
                                 dataSource={dataSource}
                                 columns={columns}
+                                rowKey="id"
                             />
                         </div>
                     </div>
@@ -250,9 +188,9 @@ function ProjectList() {
                         onChange={onHandleChange}
                         showSizeChanger
                         onShowSizeChange={onShowSizeChange}
-                        pageSize={10}
-                        defaultCurrent={1}
-                        total={40}
+                        pageSize={state.pageSize}
+                        current={state.current}
+                        total={projects.length}
                     />
                 </Col>
             </Row>
@@ -265,40 +203,6 @@ function ProjectList() {
                 className="p-6"
             >
                 <p>Are you sure you want to delete this project?</p>
-            </Modal>
-
-            <Modal
-                title="Upload Media"
-                visible={isUploadModalVisible}
-                onOk={handleUploadOk}
-                onCancel={handleUploadCancel}
-                className="p-6"
-            >
-                <Form form={form} onFinish={handleFormSubmit} layout="vertical">
-                    <Form.Item name="media" label="Upload Media">
-                        <Upload multiple listType="picture">
-                            <Button icon={<UploadOutlined />}>
-                                Select File
-                            </Button>
-                        </Upload>
-                    </Form.Item>
-                    <Form.Item name="campaign" label="Campaign">
-                        <Input placeholder="Enter campaign name" />
-                    </Form.Item>
-                    <Form.Item name="account" label="Select Account">
-                        <Select mode="multiple" placeholder="Select account(s)">
-                            <Select.Option value="account1">
-                                Account 1
-                            </Select.Option>
-                            <Select.Option value="account2">
-                                Account 2
-                            </Select.Option>
-                            <Select.Option value="account3">
-                                Account 3
-                            </Select.Option>
-                        </Select>
-                    </Form.Item>
-                </Form>
             </Modal>
         </>
     )

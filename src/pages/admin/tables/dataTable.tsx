@@ -6,7 +6,6 @@ import { Row, Col, Table, Radio, Divider } from 'antd'
 import { PageHeaders } from '@/components/page-headers'
 import Heading from '@/components/heading'
 import ProjectList from '../project/overview/ProjectList'
-
 import { tableReadData } from '@/redux/data-filter/actionCreator'
 
 function DataTables() {
@@ -64,71 +63,6 @@ function DataTables() {
             dispatch(tableReadData())
         }
     }, [dispatch])
-
-    const { tableData } = useSelector((states: RootState) => {
-        return {
-            tableData: states.dataTable.tableData,
-        }
-    })
-
-    const tableDataSource: TableDataItem[] = tableData.map((item: User) => {
-        const { id, name, country, company, position, status, date } = item
-        return {
-            key: id,
-            id: (
-                <span className="text-body dark:text-white/60 text-[15px] font-medium">{`#${id}`}</span>
-            ),
-            user: (
-                <span className="text-body dark:text-white/60 text-[15px] font-medium">
-                    {name}
-                </span>
-            ),
-            country: (
-                <span className="text-body dark:text-white/60 text-[15px] font-medium">
-                    {country}
-                </span>
-            ),
-            company: (
-                <span className="text-body dark:text-white/60 text-[15px] font-medium">
-                    {company}
-                </span>
-            ),
-            position: (
-                <span className="text-body dark:text-white/60 text-[15px] font-medium">
-                    {position}
-                </span>
-            ),
-            date: (
-                <span className="text-body dark:text-white/60 text-[15px] font-medium">
-                    {date}
-                </span>
-            ),
-            status: (
-                <span
-                    className={`inline-flex items-center justify-center bg-${status}-transparent text-${status} min-h-[24px] px-3 text-xs font-medium rounded-[15px]`}
-                >
-                    {status}
-                </span>
-            ),
-            action: (
-                <div className="min-w-[150px] text-end -m-2">
-                    <Link className="inline-block m-2" href="#">
-                        <UilEye className="w-4 text-light-extra dark:text-white/60" />
-                    </Link>
-                    <Link className="inline-block m-2" href="#">
-                        <UilEdit className="w-4 text-light-extra dark:text-white/60" />
-                    </Link>
-                    <Link className="inline-block m-2" href="#">
-                        <UilTrash className="w-4 text-light-extra dark:text-white/60" />
-                    </Link>
-                </div>
-            ),
-        }
-    })
-
-    function onChange(pagination: any, filters: any, sorter: any, extra: any) {
-        setState({ ...state, values: { pagination, filters, sorter, extra } })
-    }
 
     return (
         <>

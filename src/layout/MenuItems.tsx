@@ -148,16 +148,6 @@ function MenuItems() {
             null,
             null
         ),
-        // getItem(
-        //     <Link href={`${path}/demo-2`}>{t('Dashboard')}</Link>,
-        //     'pricing',
-        //     !topMenu && (
-        //         <Link className="menuItem-icon" href={`${path}/demo-2`}>
-        //             <UilCreateDashboard />
-        //         </Link>
-        //     ),
-        //     null
-        // ),
 
         getItem(t('Interact'), 'axios', !topMenu && <UilInstagram />, [
             getItem(
@@ -220,7 +210,7 @@ function MenuItems() {
         ),
         getItem(
             <Link href={`${path}/tables/dataTable`}>
-                {t('Data')} {t('Table')}
+                {t('Arsip')}
             </Link>,
             'dataTable',
             !topMenu && (
@@ -248,15 +238,31 @@ function MenuItems() {
             ),
             null
         ),
+        //backup
+        // getItem(
+        //     <Link href={`${path}/tables/schedule`}>
+        //         {t('Schedule')}
+        //     </Link>,
+        //     'schedule',
+        //     !topMenu && (
+        //         <Link
+        //             className="menuItem-icon"
+        //             href={`${path}/tables/schedule`}
+        //         >
+        //             <UilEdit />
+        //         </Link>
+        //     ),
+        //     null
+        // ),
         getItem(
-            <Link href={`${path}/tables/schedule`}>
+            <Link href={`${path}/tables/chooserSchedule`}>
                 {t('Schedule')}
             </Link>,
             'schedule',
             !topMenu && (
                 <Link
                     className="menuItem-icon"
-                    href={`${path}/tables/schedule`}
+                    href={`${path}/tables/chooserSchedule`}
                 >
                     <UilEdit />
                 </Link>

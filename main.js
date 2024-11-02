@@ -63,7 +63,7 @@ ipcMain.handle('startDownload', async (_, nameArsip, feed, signal) => {
 
     // Path folder tempat arsip disimpan
     const folderPath = join(
-        `${__dirname}/arsip/${nameArsip}`,
+        `${__dirname}/public/${nameArsip}`,
         feed.id.toString()
     )
     console.log('Folder Path:', folderPath)
