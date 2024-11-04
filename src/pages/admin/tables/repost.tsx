@@ -51,9 +51,16 @@ const RepostPage = () => {
         }
     };
 
-    const getRepostMedia = () => {
-        setMediaFiles('/hexadash-nextjs/repost/media-0.jpg');
-        setCaptionText('Default caption'); // Ini bisa diubah sesuai dengan caption yang diambil dari sumber lain
+    const getRepostMedia = async () => {
+        try{
+            const response = await axios.get('/hexadash-nextjs/api/mediaHandler')
+            if(response.data.succes){
+                setMediaFiles(response.data.mediaFiles)
+            }
+            setCaptionText('Default caption'); // Ini bisa diubah sesuai dengan caption yang diambil dari sumber 
+        }catch(err: any){
+            console.log(err)
+        }
     };
 
     useEffect(() => {

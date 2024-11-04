@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { Row, Col, Form, Input, Spin, Card, Modal } from 'antd'
 import { Buttons } from '@/components/buttons'
 import { useNotification } from './handler/error'
+import axios from 'axios'
 
 const { Item } = Form
 
@@ -33,20 +34,10 @@ function LoginPage() {
         console.log(dataLogin)
 
         try {
-            const response = await fetch(
-                'http://192.168.18.45:5000/api/v1/users/add',
-                {
-                    method: 'POST',
-                    headers: {
-                        'X-License-Key':
-                            'akrmxgkgfkjarhfakzmgakjherfgkaueygzamkhj',
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(dataLogin),
-                }
-            )
-            const getMessage: apiResponse = await response.json()
-            if (!response.ok) {
+            const response = await axios.post(
+                'http://192.168.18.45:5000/api/v1/users/create',dataLogin)
+            const getMessage = await response.data
+            if (!response) {
                 setLoginFailed(true)
                 openNotificationWithIcon(
                     'error',
