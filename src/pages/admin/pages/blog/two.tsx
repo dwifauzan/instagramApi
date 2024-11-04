@@ -52,6 +52,8 @@ function BlogTwo() {
         'likes' | 'comments' | 'recent' | 'oldest' | 'trending'
     >('likes')
 
+    const path = '/admin'
+
     useEffect(() => {
         if (router.query.name) {
             hastagsFeeds()
@@ -172,22 +174,18 @@ function BlogTwo() {
 
     const handlerRepost = async (feed: Feed) => {
         try{
-            const path = '/admin'
             const sendThis = {
                 url: feed.mediaItems.map(media => media.url),
                 caption: feed.caption
             }
 
-            console.log(sendThis)
-
             const response = await axios.post('/hexadash-nextjs/api/repostLoad', sendThis)
             if(!response){
                 openNotificationWithIcon('error', 'Repost failed', 'Failed to send data to repost endpoint')
+                return
             }
             openNotificationWithIcon('success', 'repost success', 'success send api')
-            setTimeout(() => {
-                router.push(`${path}/tables/repost`)
-            }, 1000);
+            await router.push(`${path}/tables/repost`)
         }catch(err: any){
             console.log(err)
             openNotificationWithIcon('error', 'Repost failed', err)

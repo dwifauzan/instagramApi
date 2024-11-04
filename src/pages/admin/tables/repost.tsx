@@ -8,7 +8,6 @@ import {
     Row,
     Col,
     Card,
-    Switch,
     Input,
     Modal,
     Spin
@@ -32,16 +31,15 @@ const RepostPage = () => {
     const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
     const [formLoading, setFormLoading] = useState(false);
     const [isModalVisible, setIsModalVisible] = useState(false);
-    const [mediaFiles, setMediaFiles] = useState<any[]>([]);
+    const [mediaFiles, setMediaFiles] = useState<string>('');
+    const [captionText, setCaptionText] = useState<string>('');
 
     const { openNotificationWithIcon, contextHolder } = useNotification();
     const [form] = Form.useForm();
 
     const getLocalData = async () => {
         try {
-            const response = await fetch(
-                'http://192.168.18.45:5000/api/v1/accounts'
-            );
+            const response = await fetch('http://192.168.18.45:5000/api/v1/accounts');
             const load = await response.json();
             const transformLoad = load.data.map((item: any) => ({
                 ...item,
@@ -53,19 +51,14 @@ const RepostPage = () => {
         }
     };
 
-    const getRepostMedia = async () => {
-        try{
-            const response = await axios.get('./public/repost')
-            setMediaFiles(response.data.file)
-            console.log(setMediaFiles)
-        }catch(err: any){
-            console.log(err)
-        }
-    }
+    const getRepostMedia = () => {
+        setMediaFiles('/hexadash-nextjs/repost/media-0.jpg');
+        setCaptionText('Default caption'); // Ini bisa diubah sesuai dengan caption yang diambil dari sumber lain
+    };
 
     useEffect(() => {
         getLocalData();
-        getRepostMedia()
+        getRepostMedia();
     }, []);
 
     const handleRepost = async (values: any) => {
@@ -91,7 +84,8 @@ const RepostPage = () => {
             formData.append('access_token', accessToken);
             formData.append('schedule_date', values.schedule_date.format('DD/MM/YYYY'));
             formData.append('schedule_time', values.schedule_time.format('HH:mm'));
-            formData.append('textareaValue', values.textareaValue); // Add textarea value
+            formData.append('textareaValue', values.textareaValue);
+            formData.append('location', values.location);
 
             const response = await axios.post(
                 '/hexadash-nextjs/api/repostLoad',
@@ -118,7 +112,6 @@ const RepostPage = () => {
                     result.message
                 );
 
-                // Reset form fields
                 form.resetFields();
                 setSelectedAccounts([]);
             }
@@ -138,33 +131,28 @@ const RepostPage = () => {
                     <Col sm={12} xs={18}>
                         <Card title="Repost" bordered={false} style={{ borderRadius: 8 }}>
                             <Form onFinish={handleRepost} layout="vertical">
-                                {/* Select Account */}
                                 <Form.Item label="Pilih Akun" name="accounts" rules={[{ required: true, message: 'Silakan pilih akun!' }]}>
                                     <Select placeholder="Pilih akun" onChange={setSelectedAccounts} style={{ width: '100%' }}>
                                         {localData.map((account) => (
                                             <Option key={account.id} value={account.id.toString()}>
-                                                {account.users.split(',')[0].trim()} {/* Display the first user */}
+                                                {account.users.split(',')[0].trim()}
                                             </Option>
                                         ))}
                                     </Select>
                                 </Form.Item>
 
-                                {/* Date Picker */}
-                                <Form.Item label="Jadwal Tanggal" name="schedule_date" rules={[{ required: true, message: 'Silakan pilih tanggal!' }]}>
-                                    <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
-                                </Form.Item>
-
-                                {/* Time Picker */}
-                                <Form.Item label="Jadwal Waktu" name="schedule_time" rules={[{ required: true, message: 'Silakan pilih waktu!' }]}>
-                                    <TimePicker format="HH:mm" style={{ width: '100%' }} />
-                                </Form.Item>
-
-                                {/* Textarea for Content */}
                                 <Form.Item label="Masukkan Teks" name="textareaValue" rules={[{ required: true, message: 'Silakan masukkan teks!' }]}>
                                     <Input.TextArea rows={4} placeholder="Masukkan teks di sini..." />
                                 </Form.Item>
 
-                                {/* Submit Button */}
+                                <Button type="dashed" onClick={() => form.setFieldsValue({ textareaValue: captionText })}>
+                                    Gunakan Caption
+                                </Button>
+
+                                <Form.Item label="Lokasi" name="location">
+                                    <Input placeholder="Masukkan lokasi..." />
+                                </Form.Item>
+
                                 <Form.Item>
                                     <Button type="primary" htmlType="submit" loading={formLoading} block>
                                         Submit Repost
@@ -173,14 +161,23 @@ const RepostPage = () => {
                             </Form>
                         </Card>
                     </Col>
+
+                    {/* Preview Media */}
+                    <Col sm={12} xs={24}>
+                        <Card title="Pratinjau Media" bordered={false} style={{ borderRadius: 8 }}>
+                            {mediaFiles && (
+                                <img src={mediaFiles} alt="Pratinjau Media" style={{ width: '100%', borderRadius: 8 }} />
+                            )}
+                        </Card>
+                    </Col>
                 </Row>
             </main>
 
             <Modal
                 visible={isModalVisible}
-                footer={null} // Remove footer buttons
-                style={{ borderRadius: 12 }} // Style modal to look like a card
-                bodyStyle={{ borderRadius: 12, padding: '20px', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)' }} // Add shadow and padding
+                footer={null}
+                style={{ borderRadius: 12 }}
+                bodyStyle={{ borderRadius: 12, padding: '20px', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)' }}
             >
                 <Spin tip="Menunggu..." spinning={formLoading} />
             </Modal>

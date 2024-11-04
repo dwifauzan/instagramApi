@@ -12,10 +12,10 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
             console.log(caption)
 
             if(!url){
-                console.log('tidak ada url')
+                return res.status(404).json({message: 'media yang dikirim tidak ada'})
             }
             if(!caption){
-                console.log('tidak ada url')
+                return res.status(404).json({message: 'caption yang dikirim tidak ada'})
             }
 
             const mediaDir = path.join(process.cwd(), './public/repost')
@@ -52,10 +52,13 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
             const captionFilePath = path.join(mediaDir, 'caption.txt')
             fs.writeFileSync(captionFilePath, caption)
 
-            console.log('success')
+            return res.status(200).json({success: true})
         }catch(err: any){
             console.log(err)
         }
+    } else {
+        res.setHeader('Allow', ['POST']);
+        res.status(405).end(`Method ${req.method} Not Allowed`);
     }
 }
 

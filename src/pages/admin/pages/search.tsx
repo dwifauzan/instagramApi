@@ -56,6 +56,14 @@ function SearchResult() {
     const fetchFeeds = useCallback(async (query: string) => {
         setLoading(true)
         try {
+            const chache = sessionStorage.getItem(query)
+            if (chache) {
+                setTimeout(() => {
+                    processAllSearchData(JSON.parse(chache))
+                    setLoading(false)
+                    return
+                }, 1000)
+            }
             console.log(localStorage.key(0))
             const token = localStorage.getItem(localStorage.key(0)!)
 
@@ -79,9 +87,14 @@ function SearchResult() {
             )
 
             processAllSearchData(response.data.data)
+            sessionStorage.setItem(query, JSON.stringify(response.data.data))
         } catch (error: any) {
             // Tangkap dan tampilkan pesan error
-            if (error.message.includes('Session expired')) {
+            if (
+                error.response &&
+                error.response.data &&
+                error.response.data.message.includes('Session not found')
+            ) {
                 localStorage.setItem(localStorage.key(1)!, 'expired')
             }
             setError(error.message || 'Error, cobalah reload halaman ini')
@@ -103,6 +116,8 @@ function SearchResult() {
     }, [searchQuery, debouncedFetchFeeds])
 
     const onSearch = (value: string) => {
+        if (value) {
+        }
         setSearchQuery(value)
     }
 
