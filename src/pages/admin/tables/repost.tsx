@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react'
 import {
     Form,
     DatePicker,
@@ -10,125 +10,129 @@ import {
     Card,
     Input,
     Modal,
-    Spin
-} from 'antd';
-import axios from 'axios';
-import { useNotification } from '@/pages/admin/crud/axios/handler/error';
+    Spin,
+} from 'antd'
+import axios from 'axios'
+import { useNotification } from '@/pages/admin/crud/axios/handler/error'
 
-const { Option } = Select;
+const { Option } = Select
+
+// interface LocalData {
+//     id: number;
+//     name: string;
+//     access_token: string;
+//     users: string;
+//     expired_at: string;
+//     isActive: boolean;
+// }
 
 interface LocalData {
-    id: number;
-    name: string;
-    access_token: string;
-    users: string;
-    expired_at: string;
-    isActive: boolean;
+    id: number
+    name: string
+    username: string
+    password: string
 }
 
 const RepostPage = () => {
-    const [localData, setLocalData] = useState<LocalData[]>([]);
-    const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
-    const [formLoading, setFormLoading] = useState(false);
-    const [isModalVisible, setIsModalVisible] = useState(false);
-    const [mediaFiles, setMediaFiles] = useState<string>('');
-    const [captionText, setCaptionText] = useState<string>('');
+    const [localData, setLocalData] = useState<LocalData[]>([])
+    const [selectedAccount, setSelectedAccount] = useState<string>('')
+    const [formLoading, setFormLoading] = useState(false)
+    const [isModalVisible, setIsModalVisible] = useState(false)
+    const [mediaFiles, setMediaFiles] = useState<string>('')
+    const [captionText, setCaptionText] = useState<string>('')
 
-    const { openNotificationWithIcon, contextHolder } = useNotification();
-    const [form] = Form.useForm();
+    const { openNotificationWithIcon, contextHolder } = useNotification()
+    const [form] = Form.useForm()
 
     const getLocalData = async () => {
         try {
-            const response = await fetch('http://192.168.18.45:5000/api/v1/accounts');
-            const load = await response.json();
-            const transformLoad = load.data.map((item: any) => ({
-                ...item,
-                id: item.id,
-            }));
-            setLocalData(transformLoad);
+            const response = await fetch(
+                'http://192.168.18.45:5000/api/v1/users'
+            )
+            const load = await response.json()
+            // const transformLoad = load.data.map((item: any) => ({
+            //     ...item,
+            //     id: item.id,
+            // }));
+            setLocalData(load.data)
         } catch (err) {
-            console.error(err);
+            console.error(err)
         }
-    };
+    }
 
-    const getRepostMedia = async () => {
-        try{
-            const response = await axios.get('/hexadash-nextjs/api/mediaHandler')
-            if(response.data.succes){
-                setMediaFiles(response.data.mediaFiles)
-            }
-            setCaptionText('Default caption'); // Ini bisa diubah sesuai dengan caption yang diambil dari sumber 
-        }catch(err: any){
-            console.log(err)
-        }
-    };
+    const getRepostMedia = () => {
+        setMediaFiles('/public/repost/media-0.jpg')
+        setCaptionText('Default caption') // Ini bisa diubah sesuai dengan caption yang diambil dari sumber lain
+    }
 
     useEffect(() => {
-        getLocalData();
-        getRepostMedia();
-    }, []);
+        getLocalData()
+        getRepostMedia()
+    }, [])
 
     const handleRepost = async (values: any) => {
-        setFormLoading(true);
-        setIsModalVisible(true);
+        // setFormLoading(true);
+        // setIsModalVisible(true);
 
         try {
-            const selectedAccountData = localData.find((account) =>
-                selectedAccounts.includes(account.id.toString())
-            );
-            if (!selectedAccountData) {
-                openNotificationWithIcon(
-                    'error',
-                    'Undefined Account',
-                    'Akun tidak ditemukan'
-                );
-                return;
+            // const selectedAccountData = localData.find((account) =>
+            //     selectedAccounts.includes(account.id.toString())
+            // );
+            // const user = await axios.get("http://192.168.18.45:5000/api/v1/users/" + selectedAccount);
+            // console.log(user.data);
+            // if (!selectedAccount) {
+            //     openNotificationWithIcon(
+            //         'error',
+            //         'Undefined Account',
+            //         'Akun tidak ditemukan'
+            //     );
+            //     return;
+            // }
+
+            // const accessToken = 'selectedAccountData.access_token';
+
+            // const formData = new FormData();
+            // formData.append('access_token', accessToken);
+            // formData.append('schedule_date', values.schedule_date.format('DD/MM/YYYY'));
+            // formData.append('schedule_time', values.schedule_time.format('HH:mm'));
+            // formData.append('textareaValue', values.textareaValue);
+            // formData.append('location', values.location);
+
+            const data = {
+                id: selectedAccount,
+                caption: captionText,
             }
 
-            const accessToken = selectedAccountData.access_token;
-
-            const formData = new FormData();
-            formData.append('access_token', accessToken);
-            formData.append('schedule_date', values.schedule_date.format('DD/MM/YYYY'));
-            formData.append('schedule_time', values.schedule_time.format('HH:mm'));
-            formData.append('textareaValue', values.textareaValue);
-            formData.append('location', values.location);
-
             const response = await axios.post(
-                '/hexadash-nextjs/api/repostLoad',
-                formData,
-                {
-                    headers: {
-                        'Content-Type': 'multipart/form-data',
-                    },
-                }
-            );
+                '/hexadash-nextjs/api/repost',
+                data
+            )
 
             if (response.status !== 200) {
-                const error = response.data;
+                const error = response.data
                 openNotificationWithIcon(
                     'error',
                     'Failed to Repost',
                     error.message
-                );
+                )
             } else {
-                const result = response.data;
+                const result = response.data
                 openNotificationWithIcon(
                     'success',
                     'Success Repost',
                     result.message
-                );
+                )
 
-                form.resetFields();
-                setSelectedAccounts([]);
+                form.resetFields()
+                setSelectedAccount('')
             }
         } catch (err: any) {
-            openNotificationWithIcon('error', 'Failed to Repost', err.message);
+            openNotificationWithIcon('error', 'Failed to Repost', err.message)
         } finally {
-            setFormLoading(false);
-            setIsModalVisible(false);
+            setFormLoading(false)
+            setIsModalVisible(false)
         }
-    };
+    }
 
     return (
         <div>
@@ -136,23 +140,65 @@ const RepostPage = () => {
             <main className="min-h-[715px] lg:min-h-[580px] bg-transparent px-8 pb-12">
                 <Row gutter={25}>
                     <Col sm={12} xs={18}>
-                        <Card title="Repost" bordered={false} style={{ borderRadius: 8 }}>
+                        <Card
+                            title="Repost"
+                            bordered={false}
+                            style={{ borderRadius: 8 }}
+                        >
                             <Form onFinish={handleRepost} layout="vertical">
-                                <Form.Item label="Pilih Akun" name="accounts" rules={[{ required: true, message: 'Silakan pilih akun!' }]}>
-                                    <Select placeholder="Pilih akun" onChange={setSelectedAccounts} style={{ width: '100%' }}>
+                                <Form.Item
+                                    label="Pilih Akun"
+                                    name="accounts"
+                                    rules={[
+                                        {
+                                            required: true,
+                                            message: 'Silakan pilih akun!',
+                                        },
+                                    ]}
+                                >
+                                    <Select
+                                        placeholder="Pilih akun"
+                                        onChange={setSelectedAccount}
+                                        style={{ width: '100%' }}
+                                    >
                                         {localData.map((account) => (
-                                            <Option key={account.id} value={account.id.toString()}>
-                                                {account.users.split(',')[0].trim()}
+                                            <Option
+                                                key={account.id}
+                                                value={account.id.toString()}
+                                            >
+                                                {account.username}
                                             </Option>
                                         ))}
                                     </Select>
                                 </Form.Item>
 
-                                <Form.Item label="Masukkan Teks" name="textareaValue" rules={[{ required: true, message: 'Silakan masukkan teks!' }]}>
-                                    <Input.TextArea rows={4} placeholder="Masukkan teks di sini..." />
+                                <Form.Item
+                                    label="Masukkan Teks"
+                                    name="textareaValue"
+                                    rules={[
+                                        {
+                                            required: true,
+                                            message: 'Silakan masukkan teks!',
+                                        },
+                                    ]}
+                                >
+                                    <Input.TextArea
+                                        rows={4}
+                                        placeholder="Masukkan teks di sini..."
+                                        onChange={(e) =>
+                                            setCaptionText(e.target.value)
+                                        }
+                                    />
                                 </Form.Item>
 
-                                <Button type="dashed" onClick={() => form.setFieldsValue({ textareaValue: captionText })}>
+                                <Button
+                                    type="dashed"
+                                    onClick={() =>
+                                        form.setFieldsValue({
+                                            textareaValue: captionText,
+                                        })
+                                    }
+                                >
                                     Gunakan Caption
                                 </Button>
 
@@ -161,7 +207,12 @@ const RepostPage = () => {
                                 </Form.Item>
 
                                 <Form.Item>
-                                    <Button type="primary" htmlType="submit" loading={formLoading} block>
+                                    <Button
+                                        type="primary"
+                                        htmlType="submit"
+                                        loading={formLoading}
+                                        block
+                                    >
                                         Submit Repost
                                     </Button>
                                 </Form.Item>
@@ -171,9 +222,17 @@ const RepostPage = () => {
 
                     {/* Preview Media */}
                     <Col sm={12} xs={24}>
-                        <Card title="Pratinjau Media" bordered={false} style={{ borderRadius: 8 }}>
+                        <Card
+                            title="Pratinjau Media"
+                            bordered={false}
+                            style={{ borderRadius: 8 }}
+                        >
                             {mediaFiles && (
-                                <img src={mediaFiles} alt="Pratinjau Media" style={{ width: '100%', borderRadius: 8 }} />
+                                <img
+                                    src="/hexadash-nextjs/repost/media-0.jpg"
+                                    alt="Pratinjau Media"
+                                    style={{ width: '100%', borderRadius: 8 }}
+                                />
                             )}
                         </Card>
                     </Col>
@@ -184,12 +243,16 @@ const RepostPage = () => {
                 visible={isModalVisible}
                 footer={null}
                 style={{ borderRadius: 12 }}
-                bodyStyle={{ borderRadius: 12, padding: '20px', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)' }}
+                bodyStyle={{
+                    borderRadius: 12,
+                    padding: '20px',
+                    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+                }}
             >
                 <Spin tip="Menunggu..." spinning={formLoading} />
             </Modal>
         </div>
-    );
-};
+    )
+}
 
-export default RepostPage;
+export default RepostPage

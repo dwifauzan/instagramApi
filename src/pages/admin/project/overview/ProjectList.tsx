@@ -20,11 +20,14 @@ import DropDown from '@/components/dropdown'
 import { UploadOutlined } from '@ant-design/icons'
 import { useRouter } from 'next/router'
 import { useData } from '@/components/table/detailProvider'
+import axios from 'axios'
+import ScheduleModal from './Modal'
 
 interface Project {
     id: number
     nama_arsip: string
     created_at: any
+    folder_arsip: any
 }
 
 interface RootState {
@@ -39,17 +42,19 @@ function ProjectList() {
     const [projects, setProjects] = useState<Project[]>([])
     const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false)
     const [deleteProjectId, setDeleteProjectId] = useState<number | null>(null)
+    const [isModalVisible, setIsModalVisible] = useState(false)
+    const [arsipIndex, setArsipIndex] = useState(0)
     const [state, setState] = useState({
         current: 1,
         pageSize: 10,
     })
 
-    const {setData} = useData() 
+    const { setData } = useData()
 
     useEffect(() => {
         const getArsip = async () => {
             const response = await (window as any).electron.getFeedData()
-            console.log(response)
+            // console.log(response)
             setProjects(response)
         }
         getArsip()
@@ -57,14 +62,43 @@ function ProjectList() {
 
     const lala = (index: number) => {
         setData(projects[index])
-        router.push({ pathname: `${path}/project/detailArsip/detail`})
+        router.push({ pathname: `${path}/project/detailArsip/detail` })
     }
 
-    const moreContent = (index: number,onDelete: () => void) => [
+    const handleSchedule = async (i: any) => {
+        const nama_arsip = projects[i].nama_arsip
+        const captions = projects[i].folder_arsip.map((item: any) => {
+            return item.caption
+        })
+        console.log(nama_arsip)
+        console.log(captions)
+        const schedule_massal = axios.post(
+            '/hexadash-nextjs/api/schedule_arsip',
+            { nama_arsip, captions }
+        )
+    }
+
+    const handleScheduleSubmit = async (data: any) => {
+        // await axios.post('/api/schedule_arsip', data)
+        const dataSchedule = {
+            ...data,
+            captions: projects[arsipIndex].folder_arsip.map((item: any) => {
+                return item.caption
+            }),
+            nama_arsip: projects[arsipIndex].nama_arsip,
+        }
+        console.log(dataSchedule)
+    }
+
+    const moreContent = (index: number, onDelete: () => void) => [
         {
             key: '1',
             label: (
                 <Link
+                    onClick={() => {
+                        setIsModalVisible(true)
+                        setArsipIndex(index)
+                    }}
                     className="flex items-center text-theme-gray dark:text-white/60 hover:bg-gray-200 hover:text-primary dark:hover:bg-gray-700 px-3 py-1.5 text-sm active"
                     href="#"
                 >
@@ -136,7 +170,9 @@ function ProjectList() {
         action: (
             <DropDown
                 className="min-w-[140px] hover:bg-gray-100 dark:hover:bg-gray-800"
-                customContent={moreContent(index, () => showDeleteConfirm(project.id))}
+                customContent={moreContent(index, () =>
+                    showDeleteConfirm(project.id)
+                )}
             >
                 <Link href="#">
                     <UilEllipsisH className="w-4 h-4 text-light-extra dark:text-white/60 hover:text-primary" />
@@ -194,6 +230,12 @@ function ProjectList() {
                     />
                 </Col>
             </Row>
+
+            <ScheduleModal
+                visible={isModalVisible}
+                onClose={() => setIsModalVisible(false)}
+                onSubmit={handleScheduleSubmit}
+            />
 
             <Modal
                 title="Confirm Delete"

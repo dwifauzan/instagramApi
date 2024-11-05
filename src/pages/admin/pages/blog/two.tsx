@@ -64,6 +64,13 @@ function BlogTwo() {
         if (loading) return
         setLoading(true)
         try {
+            const cachedData = sessionStorage.getItem(`${router.query.name}-feeds`)
+            if (cachedData) {
+                setFeeds(JSON.parse(cachedData))
+                setLoading(false)
+                return
+            }
+
             const token = localStorage.getItem(localStorage.key(0)!)
             if (!token) {
                 openNotificationWithIcon(
@@ -81,6 +88,10 @@ function BlogTwo() {
             if (Array.isArray(response.data.data)) {
                 setFeeds(response.data.data)
                 setNextMaxPage(response.data.next_max_id)
+                sessionStorage.setItem(
+                    `${router.query.name}-feeds`,
+                    JSON.stringify(response.data.data)
+                )
             } else {
                 openNotificationWithIcon(
                     'error',

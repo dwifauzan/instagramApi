@@ -90,6 +90,7 @@ function SearchResult() {
             sessionStorage.setItem(query, JSON.stringify(response.data.data))
         } catch (error: any) {
             // Tangkap dan tampilkan pesan error
+            console.log(error)
             if (
                 error.response &&
                 error.response.data &&
