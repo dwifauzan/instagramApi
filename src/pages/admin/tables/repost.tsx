@@ -107,6 +107,7 @@ const RepostPage = () => {
                 setSelectedAccount('')
             }
         } catch (err: any) {
+            localStorage.setItem('retry-repost-route', '/admin/tables/repost')
             openNotificationWithIcon('error', 'Failed to Repost', err.message)
         } finally {
             setFormLoading(false)

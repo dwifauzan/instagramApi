@@ -6,12 +6,24 @@ import { PageHeaders } from '@/components/page-headers'
 import { useNotification } from './handler/error' // Import hook
 import { jwtDecode } from 'jwt-decode' // Import with correct usage
 import { useRouter } from 'next/router'
+import { useCallback } from './handler/callbackRepost' // Import hook
 
 interface DataSource {
     id: number
     name: string
     username: string
     action: JSX.Element
+}
+
+const NotificationRepost = ({ linkHref }: { linkHref: string }) => {
+    return (
+        <div className="absolute z-40 top-3 right-4 bg-white ps-4 pe-6 py-2 rounded shadow-md text-base">
+            <p>Anda sebelumnya sudah mencoba melakukan repost</p>
+            <Button className="text-white bg-blue-500 px-6 py-3">
+            <Link href={linkHref} passHref>klik area ini</Link>
+            </Button>
+        </div>
+    )
 }
 
 function ViewPage() {
@@ -26,6 +38,8 @@ function ViewPage() {
     const [selectedRecord, setSelectedRecord] = useState<DataSource | null>(
         null
     )
+    const { callbackRepost, contextHolderRepost } = useCallback()
+    const [isNotified, setIsNotified] = useState(false)
     const { openNotificationWithIcon, contextHolder } = useNotification() // Use hook
     //delete modal dan session
     const [confirmSessio, setConfirmSessio] = useState<boolean>(false)
@@ -63,6 +77,12 @@ function ViewPage() {
     // Checking which users are logged in from sessionStorage
     useEffect(() => {
         fetchData()
+    }, [])
+    useEffect(() => {
+        const readRepost = localStorage.getItem('retry-repost-route')
+        if (readRepost && !isNotified) {
+            setIsNotified(true)
+        }
     }, [])
 
     useEffect(() => {
@@ -281,7 +301,10 @@ function ViewPage() {
     ]
 
     return (
-        <div>
+        <div className="relative">
+            {isNotified && (
+                <NotificationRepost linkHref="/admin/tables/repost" />
+            )}
             {contextHolder} {/* Render notification context holder */}
             <PageHeaders
                 className="flex items-center justify-between px-[30px] py-[25px] bg-transparent"

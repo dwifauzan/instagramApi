@@ -53,6 +53,7 @@ interface LocalData {
 }
 
 function ProjectDetail() {
+    const [form] = Form.useForm()
     const { data } = useData() as any
     const [delayedData, setDelayedData] = useState<FolderArsip[]>([])
     const [loading, setLoading] = useState(true)
