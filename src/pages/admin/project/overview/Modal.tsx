@@ -55,8 +55,11 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
     }
 
     const handleFinish = (values: any) => {
+        const accessToken = usersF.find((user: any) => user.id === fSelected).access_toke6n
+        console.log(accessToken)
         const data = {
             ...values,
+            access_token: accessToken,  
             schedule_date: values.schedule_date.format('YYYY-MM-DD'),
             schedule_time: values.schedule_time.format('HH:mm'),
         }

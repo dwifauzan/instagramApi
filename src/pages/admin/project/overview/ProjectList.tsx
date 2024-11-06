@@ -28,7 +28,7 @@ function ProjectList() {
         pageSize: 10,
     })
 
-    const {setData} = useData() 
+    const { setData } = useData() as any
 
     useEffect(() => {
         const getArsip = async () => {projects
