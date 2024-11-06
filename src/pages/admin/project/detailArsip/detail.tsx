@@ -1,10 +1,25 @@
 import { useState, useEffect } from 'react'
-import { Card, Col, Row, Tag, Spin } from 'antd'
+import {
+    Card,
+    Col,
+    Row,
+    Tag,
+    Spin,
+    Button,
+    Modal,
+    Select,
+    Upload,
+    DatePicker,
+    TimePicker,
+    Form,
+} from 'antd'
 import DataTable from '@/components/table/DataTable'
 import Link from 'next/link'
 import { UilEye, UilEdit, UilTrash } from '@iconscout/react-unicons'
 import { PageHeaders } from '@/components/page-headers'
 import { useData } from '@/components/table/detailProvider'
+import axios from 'axios'
+import moment from 'moment'
 
 interface FolderArsip {
     id: number
@@ -13,7 +28,7 @@ interface FolderArsip {
     like: number
     coment: number
     created_at: string
-    isExecuted: boolean // Assuming this field indicates execution status
+    isExecuted: boolean
 }
 
 interface TableDataItem {
@@ -26,10 +41,39 @@ interface TableDataItem {
     action: React.ReactNode
 }
 
+const { Option } = Select
+
+interface LocalData {
+    id: number
+    name: string
+    access_token: string
+    users: string
+    expired_at: string
+    isActive: boolean
+}
+
 function ProjectDetail() {
     const { data } = useData()
+    const [form] = Form.useForm()
     const [delayedData, setDelayedData] = useState<FolderArsip[]>([])
     const [loading, setLoading] = useState(true)
+    const [modalVisible, setModalVisible] = useState(false)
+    const [selectedOption, setSelectedOption] = useState<string | undefined>(
+        undefined
+    )
+    const [scheduledDate, setScheduledDate] = useState<moment.Moment | null>(
+        null
+    )
+    const [scheduledTime, setScheduledTime] = useState<moment.Moment | null>(
+        null
+    )
+    const [localData, setLocalData] = useState<LocalData[]>([])
+    const [selectedAccounts, setSelectedAccounts] = useState<string[]>([])
+    const [selectedUsers, setSelectedUsers] = useState<string[]>([])
+
+    const [usersF, setUsersF] = useState<any[]>([]) // facebook
+    const [usersI, setUsersI] = useState<[]>([]) // instagram
+    const [fSelected, setFSelected] = useState<number>(0)
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -40,44 +84,106 @@ function ProjectDetail() {
         return () => clearTimeout(timer)
     }, [data])
 
+    useEffect(() => {
+        const getUsers = async () => {
+            try {
+                const response = await axios.get(
+                    'http://192.168.18.45:5000/api/v1/accounts'
+                )
+                setUsersF(response.data.data)
+            } catch (error) {
+                console.error('Error fetching users:', error)
+            }
+        }
+        getUsers()
+    }, [])
+
+    const handleSelectF = (value: number) => {
+        setFSelected(value)
+        const userI = usersF.find((user: any) => user.id === value)
+        setUsersI(userI.users.split(','))
+    }
+
+    const getLocalData = async () => {
+        try {
+            const response = await fetch(
+                'http://192.168.18.45:5000/api/v1/accounts'
+            )
+            const load = await response.json()
+            const transformLoad = load.data.map((item: any) => ({
+                ...item,
+                id: item.id,
+            }))
+            setLocalData(transformLoad)
+        } catch (err) {
+            console.error(err)
+        }
+    }
+    const handleAccountChange = (selectedAccountId: string) => {
+        setSelectedAccounts([selectedAccountId])
+        const users: string[] = []
+        const account = localData.find(
+            (item) => item.id.toString() === selectedAccountId
+        )
+        if (account) {
+            const accountUsers = account.users
+                .split(',')
+                .map((user) => user.trim())
+            users.push(...accountUsers)
+        }
+        setSelectedUsers(users)
+    }
+
     const dataTableColumn = [
-        {
-            title: 'Media',
-            dataIndex: 'media',
-            key: 'media',
-        },
-        {
-            title: 'Caption',
-            dataIndex: 'caption',
-            key: 'caption',
-        },
-        {
-            title: 'Like',
-            dataIndex: 'like',
-            key: 'like',
-        },
-        {
-            title: 'Comment',
-            dataIndex: 'comment',
-            key: 'comment',
-        },
-        {
-            title: 'Created at',
-            dataIndex: 'createAt',
-            key: 'createAt',
-        },
-        {
-            title: 'Status',
-            dataIndex: 'status',
-            key: 'status',
-        },
-        {
-            title: 'Actions',
-            dataIndex: 'action',
-            key: 'action',
-            width: '90px',
-        },
+        { title: 'Media', dataIndex: 'media', key: 'media' },
+        { title: 'Caption', dataIndex: 'caption', key: 'caption' },
+        { title: 'Like', dataIndex: 'like', key: 'like' },
+        { title: 'Comment', dataIndex: 'comment', key: 'comment' },
+        { title: 'Created at', dataIndex: 'createAt', key: 'createAt' },
+        { title: 'Status', dataIndex: 'status', key: 'status' },
+        { title: 'Actions', dataIndex: 'action', key: 'action', width: '90px' },
     ]
+
+    const handleSchedule = async (values: any) => {
+        console.log(values)
+        try {
+            const accessToken = usersF.find(
+                (user: any) => user.id === fSelected
+            ).access_token
+
+            // Menyiapkan payload untuk dikirim ke endpoint
+            const payload = {
+                folderArsip: delayedData, // Data folder arsip yang tertunda
+                date: values.schedule_date.format('DD/MM/YYYY'), // Pastikan tanggal tidak null
+                time: values.schedule_time.format('HH:mm'), // Pastikan waktu tidak null
+                access_token: accessToken,
+                users: values.users_instagram, // Akun Instagram yang dipilih
+            }
+
+            // Mengirimkan payload ke endpoint
+            const response = await axios.post(
+                '/hexadash-nextjs/api/schedule',
+                payload
+            )
+
+            console.log('Jadwal berhasil dibuat:', response)
+
+            // Reset form fields setelah pengiriman berhasil
+            setSelectedOption(undefined)
+            setScheduledDate(null)
+            setScheduledTime(null)
+        } catch (err: any) {
+            console.error('Error scheduling:', err)
+        }
+    }
+
+    const handleDateChange = (date: moment.Moment | null) => {
+        setScheduledDate(date)
+    }
+
+    const handleTimeChange = (time: moment.Moment | null) => {
+        setScheduledTime(time)
+    }
 
     const tableDataSource: TableDataItem[] = delayedData.map(
         (item: FolderArsip) => {
@@ -89,10 +195,10 @@ function ProjectDetail() {
                 detail_content,
                 isExecuted,
             } = item
-
-            const xoxo = detail_content.file_path.split('/') 
-            const felepath = `${xoxo[xoxo.length-3]}/${xoxo[xoxo.length-2]}/${xoxo[xoxo.length-1]}`  
-            console.log(felepath)
+            const xoxo = detail_content.file_path.split('/')
+            const felepath = `${xoxo[xoxo.length - 3]}/${
+                xoxo[xoxo.length - 2]
+            }/${xoxo[xoxo.length - 1]}`
 
             const mediaElement =
                 detail_content.media_type === 1 ? (
@@ -104,7 +210,7 @@ function ProjectDetail() {
                 ) : (
                     <video controls className="w-[50px] h-[50px] object-cover">
                         <source
-                            src={detail_content.file_path}
+                            src={`/hexadash-nextjs/arsip/${felepath}`}
                             type="video/mp4"
                         />
                         Your browser does not support the video tag.
@@ -112,18 +218,12 @@ function ProjectDetail() {
                 )
 
             // Determine status
-            let statusText
-            let statusColor
+            let statusText = 'Pending'
+            let statusColor = 'orange'
 
-            if (!isExecuted) {
-                statusText = 'Pending'
-                statusColor = 'orange' // You can change the color as needed
-            } else if (like > 500) {
-                statusText = 'Success'
-                statusColor = 'green'
-            } else {
-                statusText = 'Failed'
-                statusColor = 'red'
+            if (isExecuted) {
+                statusText = like > 500 ? 'Success' : 'Failed'
+                statusColor = like > 500 ? 'green' : 'red'
             }
 
             return {
@@ -180,15 +280,12 @@ function ProjectDetail() {
     )
 
     const PageRoutes = [
-        {
-            path: 'index',
-            breadcrumbName: 'Dashboard',
-        },
-        {
-            path: 'first',
-            breadcrumbName: 'Table',
-        },
+        { path: 'index', breadcrumbName: 'Dashboard' },
+        { path: 'first', breadcrumbName: 'Detail Arsip' },
     ]
+    useEffect(() => {
+        getLocalData()
+    }, [])
 
     return (
         <>
@@ -201,13 +298,22 @@ function ProjectDetail() {
                 <Row gutter={15}>
                     <Col xs={24} className="mb-[25px]">
                         <div className="bg-white dark:bg-white/10 m-0 p-0 mb-[25px] rounded-10 relative">
+                            <div className="flex justify-between items-center p-[20px]">
+                                <Button
+                                    className="px-12 py-5 text-medium"
+                                    type="primary"
+                                    onClick={() => setModalVisible(true)}
+                                >
+                                    Start Schedule
+                                </Button>
+                            </div>
                             <div className="p-[25px]">
                                 {loading ? (
                                     <Spin size="large" tip="Loading data..." />
                                 ) : (
                                     <DataTable
                                         filterOnchange
-                                        filterOption
+                                        filterOption={false}
                                         tableData={tableDataSource}
                                         columns={dataTableColumn}
                                         rowSelection={false}
@@ -218,6 +324,106 @@ function ProjectDetail() {
                     </Col>
                 </Row>
             </div>
+
+            {/* Modal for Scheduling */}
+            <Modal visible={modalVisible} footer={false}>
+                <div className="px-5 py-3">
+                    <div className="mb-5">
+                        <h1 className="capitalize text-2xl font-semibold">
+                            jadwalkan arsip
+                        </h1>
+                    </div>
+                    <Form
+                        form={form}
+                        layout="vertical"
+                        onFinish={(values) => {
+                            console.log('Form Values:', values) // Debug: Pastikan untuk cek log ini
+                            handleSchedule(values)
+                        }}
+                    >
+                        <Form.Item
+                            name="users_facebook"
+                            label="Akun Facebook"
+                            rules={[
+                                {
+                                    required: true,
+                                    message: 'Pilih akun Facebook!',
+                                },
+                            ]}
+                        >
+                            <Select
+                                placeholder="Select Users Facebook"
+                                onChange={handleSelectF}
+                            >
+                                {usersF?.map((user: any) => (
+                                    <Select.Option
+                                        value={user.id}
+                                        key={user.id}
+                                    >
+                                        {user.name}
+                                    </Select.Option>
+                                ))}
+                            </Select>
+                        </Form.Item>
+
+                        <Form.Item
+                            name="users_instagram"
+                            label="Akun Instagram terkait"
+                            rules={[
+                                {
+                                    required: true,
+                                    message: 'Pilih akun Instagram!',
+                                },
+                            ]}
+                        >
+                            <Select
+                                placeholder="Select Users Instagram"
+                                options={usersI?.map((user: any) => ({
+                                    value: user,
+                                    label: user,
+                                }))}
+                            />
+                        </Form.Item>
+
+                        <Form.Item
+                            name="schedule_date"
+                            label="Tanggal"
+                            rules={[
+                                {
+                                    required: true,
+                                    message: 'Tentukan tanggal!',
+                                },
+                            ]}
+                        >
+                            <DatePicker
+                                format="DD/MM/YYYY"
+                                className="w-full"
+                            />
+                        </Form.Item>
+
+                        <Form.Item
+                            name="schedule_time"
+                            label="Waktu"
+                            rules={[
+                                { required: true, message: 'Tentukan waktu!' },
+                            ]}
+                        >
+                            <TimePicker format="HH:mm" className="w-full" />
+                        </Form.Item>
+
+                        <Form.Item>
+                            <Button type="primary" htmlType="submit">
+                                Submit
+                            </Button>
+                        </Form.Item>
+                        <Form.Item>
+                            <Button onClick={() => setModalVisible(false)}>
+                                cancel
+                            </Button>
+                        </Form.Item>
+                    </Form>
+                </div>
+            </Modal>
         </>
     )
 }

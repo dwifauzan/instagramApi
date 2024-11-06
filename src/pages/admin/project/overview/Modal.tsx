@@ -125,5 +125,4 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
         </Modal>
     )
 }
-
 export default ScheduleModal

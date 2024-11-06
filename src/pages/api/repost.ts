@@ -1,4 +1,3 @@
-// Next.js API route support: https://nextjs.org/docs/api-routes/introduction
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { IgApiClient } from 'instagram-private-api'
 import axios from 'axios'
@@ -75,8 +74,19 @@ export const repostToInstagram = async (
             const publish = await ig.publish.photo({ file: photo, caption })
             return { success: true, media: publish }
         }
-    } catch (error: any) {
-        console.error('Repost to Instagram error:', error)
+    } catch (err: any) {
+        let error = {status: err.status || 500, message: err.message}
+        
+        if (err.message.includes("login_required")) {
+            error.status = 401
+            error.message = "Session expired, please login again"
+        } else if (err.message.includes("challenge_required")) {
+            error.status = 401
+            error.message = "akun terdeteksi sebagai bot, silahkan selesaikan chalenge"
+        } else if (err.message.includes("getaddrinfo EAI_AGAIN")) {
+            error.status = 408
+            error.message = "Connection refused, please check your internet connection"
+        }
         return { success: false, error: error.message }
     }
 }

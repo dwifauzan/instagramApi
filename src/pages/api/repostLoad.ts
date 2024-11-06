@@ -82,6 +82,7 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
             fs.writeFileSync(captionFilePath, caption);
 
             return res.status(200).json({ success: true });
+            
         } catch (err: any) {
             console.error(err);
             return res.status(500).json({ message: 'Error saving media and caption' });

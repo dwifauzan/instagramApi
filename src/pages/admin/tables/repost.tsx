@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import {
     Form,
-    DatePicker,
-    TimePicker,
     Button,
     Select,
     Row,
@@ -11,20 +9,12 @@ import {
     Input,
     Modal,
     Spin,
+    Image,
 } from 'antd'
 import axios from 'axios'
 import { useNotification } from '@/pages/admin/crud/axios/handler/error'
 
 const { Option } = Select
-
-// interface LocalData {
-//     id: number;
-//     name: string;
-//     access_token: string;
-//     users: string;
-//     expired_at: string;
-//     isActive: boolean;
-// }
 
 interface LocalData {
     id: number
@@ -50,19 +40,18 @@ const RepostPage = () => {
                 'http://192.168.18.45:5000/api/v1/users'
             )
             const load = await response.json()
-            // const transformLoad = load.data.map((item: any) => ({
-            //     ...item,
-            //     id: item.id,
-            // }));
-            setLocalData(load.data)
+            const localStorageKeys = Object.keys(localStorage);
+            const filteredData = load.data.filter((user: any) =>
+                localStorageKeys.includes(user.name)
+            );
+            setLocalData(filteredData)
         } catch (err) {
             console.error(err)
         }
     }
 
     const getRepostMedia = () => {
-        setMediaFiles('/public/repost/media-0.jpg')
-        setCaptionText('Default caption') // Ini bisa diubah sesuai dengan caption yang diambil dari sumber lain
+        setMediaFiles('/hexadash-nextjs/repost/media-0.jpg')
     }
 
     useEffect(() => {
@@ -70,38 +59,29 @@ const RepostPage = () => {
         getRepostMedia()
     }, [])
 
+    // Fungsi untuk membaca file caption.txt
+    const fetchCaptionFromFile = async () => {
+        try {
+            const response = await fetch('/hexadash-nextjs/repost/caption.txt')
+            console.log(response)
+            const text = await response.text()
+            setCaptionText(text)
+            form.setFieldsValue({ textareaValue: text }) // Isi textarea dengan teks dari file
+        } catch (error) {
+            console.error("Gagal membaca file caption.txt:", error)
+        }
+    }
+
     const handleRepost = async (values: any) => {
-        // setFormLoading(true);
-        // setIsModalVisible(true);
+        setFormLoading(true)
+        setIsModalVisible(true)
 
         try {
-            // const selectedAccountData = localData.find((account) =>
-            //     selectedAccounts.includes(account.id.toString())
-            // );
-            // const user = await axios.get("http://192.168.18.45:5000/api/v1/users/" + selectedAccount);
-            // console.log(user.data);
-            // if (!selectedAccount) {
-            //     openNotificationWithIcon(
-            //         'error',
-            //         'Undefined Account',
-            //         'Akun tidak ditemukan'
-            //     );
-            //     return;
-            // }
-
-            // const accessToken = 'selectedAccountData.access_token';
-
-            // const formData = new FormData();
-            // formData.append('access_token', accessToken);
-            // formData.append('schedule_date', values.schedule_date.format('DD/MM/YYYY'));
-            // formData.append('schedule_time', values.schedule_time.format('HH:mm'));
-            // formData.append('textareaValue', values.textareaValue);
-            // formData.append('location', values.location);
-
             const data = {
                 id: selectedAccount,
                 caption: captionText,
             }
+            console.log(data.id)
 
             const response = await axios.post(
                 '/hexadash-nextjs/api/repost',
@@ -185,6 +165,7 @@ const RepostPage = () => {
                                     <Input.TextArea
                                         rows={4}
                                         placeholder="Masukkan teks di sini..."
+                                        value={captionText}
                                         onChange={(e) =>
                                             setCaptionText(e.target.value)
                                         }
@@ -193,11 +174,7 @@ const RepostPage = () => {
 
                                 <Button
                                     type="dashed"
-                                    onClick={() =>
-                                        form.setFieldsValue({
-                                            textareaValue: captionText,
-                                        })
-                                    }
+                                    onClick={fetchCaptionFromFile}
                                 >
                                     Gunakan Caption
                                 </Button>
@@ -228,12 +205,14 @@ const RepostPage = () => {
                             style={{ borderRadius: 8 }}
                         >
                             {mediaFiles && (
-                                <img
-                                    src="/hexadash-nextjs/repost/media-0.jpg"
+                                <Image
+                                width={350}
+                                height={450}
+                                    src={mediaFiles}
                                     alt="Pratinjau Media"
-                                    style={{ width: '100%', borderRadius: 8 }}
                                 />
                             )}
+                            <p>{captionText}</p>
                         </Card>
                     </Col>
                 </Row>
@@ -242,6 +221,7 @@ const RepostPage = () => {
             <Modal
                 visible={isModalVisible}
                 footer={null}
+                maskClosable={false}
                 style={{ borderRadius: 12 }}
                 bodyStyle={{
                     borderRadius: 12,
