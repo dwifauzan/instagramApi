@@ -25,15 +25,6 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
         try {
             const { folderArsip, access_token, date, time, users } = req.body
 
-            // Lakukan sesuatu dengan data
-            console.log('Data diterima:', {
-                folderArsip,
-                access_token,
-                date,
-                time,
-                users,
-            })
-
             const browser = await puppeteer.launch({ headless: false })
             const page = await browser.newPage()
             await page.setViewport({ width: 1366, height: 768 })
@@ -64,14 +55,29 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
                 const mediaFilePath = path.join(item.detail_content.file_path)
 
                 if (fs.existsSync(mediaFilePath)) {
-                    const [fileChooser] = await Promise.all([
-                        page.waitForFileChooser(),
-                        page.click('[role="button"]'), // Tombol untuk memilih file
-                    ])
-                    await fileChooser.accept([mediaFilePath])
-                    console.log(
-                        `File ${item.detail_content.file_path} berhasil diunggah`
-                    )
+                    // membaca isi filepath
+                    // Pastikan mediaDirectoryPath mengarah ke folder
+                    const mediaDirectoryPath = fs
+                        .statSync(item.detail_content.file_path)
+                        .isDirectory()
+                        ? item.detail_content.file_path
+                        : path.dirname(item.detail_content.file_path)
+
+                    const files = fs.readdirSync(mediaDirectoryPath)
+                    const splitPath = mediaFilePath.split('/')
+                    splitPath.pop()
+                    const resultPath = splitPath.join('/')
+                    for(const file of files){
+                        const finalPath = path.join(resultPath, file)
+                        const [fileChooser] = await Promise.all([
+                            page.waitForFileChooser(),
+                            page.click('[role="button"]'), // Tombol untuk memilih file
+                        ])
+                        await fileChooser.accept([finalPath])
+                        console.log(
+                            `File ${file} berhasil diunggah`
+                        )
+                    }
                     await new Promise((resolve) => setTimeout(resolve, 2000))
 
                     // Masukkan caption ke dalam textarea
@@ -122,20 +128,26 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
                             await dateInput.type(date)
                             console.log('Date successfully filled.')
                         }
-                        await new Promise((resolve) => setTimeout(resolve, 2000))
+                        await new Promise((resolve) =>
+                            setTimeout(resolve, 2000)
+                        )
 
                         let [hours, minutes] = time.split(':')
                         const hoursInput = await page.$(planning.hours)
                         if (hoursInput) {
                             await hoursInput.click({ clickCount: 3 })
-                            await hoursInput.type(String(hours).padStart(2, '0'))
+                            await hoursInput.type(
+                                String(hours).padStart(2, '0')
+                            )
                             console.log('Hours successfully filled.')
                         }
 
                         const minutesInput = await page.$(planning.minutes)
                         if (minutesInput) {
                             await minutesInput.click({ clickCount: 3 })
-                            await minutesInput.type(String(minutes).padStart(2, '0'))
+                            await minutesInput.type(
+                                String(minutes).padStart(2, '0')
+                            )
                             console.log('Minutes successfully filled.')
                         }
                     } else {

@@ -60,6 +60,8 @@ export const repostToInstagram = async (
             await ig.state.deserializeCookieJar(sessionData.cookieJar)
         }
 
+        await new Promise((resolve) => setTimeout(resolve, 3000))
+
         const directoryPath = path.join(process.cwd(), 'public', 'repost');
         const files = fs.readdirSync(directoryPath)
 
@@ -75,15 +77,16 @@ export const repostToInstagram = async (
             return { success: true, media: publish }
         }
     } catch (err: any) {
+        console.log(err)
         let error = {status: err.status || 500, message: err.message}
         
-        if (err.message.includes("login_required")) {
-            error.status = 401
+        if (err.includes("login_required")) {
+            error.status = 403
             error.message = "Session expired, please login again"
-        } else if (err.message.includes("challenge_required")) {
+        } else if (err.includes("challenge_required")) {
             error.status = 401
             error.message = "akun terdeteksi sebagai bot, silahkan selesaikan chalenge"
-        } else if (err.message.includes("getaddrinfo EAI_AGAIN")) {
+        } else if (err.includes("getaddrinfo EAI_AGAIN")) {
             error.status = 408
             error.message = "Connection refused, please check your internet connection"
         }

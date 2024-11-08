@@ -73,13 +73,22 @@ function ProjectList() {
         ),
         created_at: (
             <span className="text-body dark:text-white/60 text-[15px] font-medium">
-                {new Date(project.created_at).toLocaleDateString()}
+                {/* Menampilkan tanggal dan waktu lengkap */}
+                {new Date(project.created_at).toLocaleString('id-ID', {
+                    weekday: 'long', // Menampilkan hari (Senin, Selasa, dll)
+                    year: 'numeric', // Menampilkan tahun
+                    month: 'long', // Menampilkan nama bulan (Januari, Februari, dll)
+                    day: 'numeric', // Menampilkan tanggal
+                    hour: '2-digit', // Menampilkan jam (format 2 digit)
+                    minute: '2-digit', // Menampilkan menit (format 2 digit)
+                    hour12: false, // Menggunakan format waktu 24 jam
+                })}
             </span>
         ),
         action: (
             <div className='inline-flex gap-4'>
                 <button onClick={() => lala(index)} className='flex gap-3 bg-blue-600 text-white px-4 py-2 rounded-md shadow-sm text-base'><UilSetting/> Aksi</button>
-                <button className='flex gap-3 bg-red-600 text-white px-4 py-2 rounded-md shadow-sm text-base'><UilTrash/> Aksi</button>
+                <button className='flex gap-3 bg-red-600 text-white px-4 py-2 rounded-md shadow-sm text-base'><UilTrash/> Delete</button>
             </div>
         ),
     }))

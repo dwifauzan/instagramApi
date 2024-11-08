@@ -150,6 +150,8 @@ function BlogTwo() {
             ),
         }))
 
+        console.log(selectedFeeds)
+
         const total = selectedFeeds.reduce(
             (acc, feed) => acc + feed.mediaItems.length,
             0
