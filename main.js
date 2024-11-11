@@ -1,10 +1,11 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron')
+const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('path')
 const fs = require('fs-extra')
 const axios = require('axios')
 const { createWriteStream } = require('fs')
 const { join } = require('path')
 const { PrismaClient } = require('@prisma/client')
+const ffmpeg = require('fluent-ffmpeg')
 
 const prisma = new PrismaClient()
 
@@ -131,38 +132,54 @@ const downloadFile = async (
     const response = await axios.get(url, { responseType: 'stream' })
     const fileExtension =
         mediaType === 'photo' ? '.jpg' : mediaType === 'video' ? '.mp4' : ''
-    const fileName = `untitled${
+    const originalFileName = `untitled${
         isCarousel ? `-${index + 1}` : ''
     }${fileExtension}`
-    const filePath = join(folderPath, fileName)
+    const originalFilePath = join(folderPath, originalFileName)
 
-    const writer = createWriteStream(filePath)
+    const writer = createWriteStream(originalFilePath)
     response.data.pipe(writer)
 
     return new Promise((resolve, reject) => {
         writer.on('finish', async () => {
             try {
-                // Cek apakah sudah ada DetailContent untuk arsip ini
-                const existingDetail = await prisma.detailContent.findUnique({
-                    where: { folderArsipId: arsipId },
-                })
+                if (mediaType === 'video') {
+                    const outputFilePath = join(
+                        folderPath,
+                        `resized-${originalFileName}`
+                    )
 
-                // Buat hanya jika tidak ada entry sebelumnya
-                if (!existingDetail) {
-                    await prisma.detailContent.create({
-                        data: {
-                            file_path: filePath,
-                            media_type: type,
-                            folderArsipId: arsipId,
-                        },
-                    })
+                    // Menggunakan fluent-ffmpeg untuk mengubah ukuran video
+                    ffmpeg(originalFilePath)
+                        .outputOptions([
+                            '-vf',
+                            'scale=1080:-1, pad=1080:1350:(1080-iw)/2:(1350-ih)/2', // Mengubah ukuran video menjadi 4:5
+                            '-c:a',
+                            'copy',
+                        ])
+                        .on('end', () => {
+                            console.log(
+                                `Video resized successfully: ${outputFilePath}`
+                            )
+                            resolve() // Selesaikan promise setelah selesai
+                        })
+                        .on('error', (err) => {
+                            console.error(`FFmpeg error: ${err.message}`)
+                            reject(err) // Tolak promise jika ada kesalahan
+                        })
+                        .save(outputFilePath) // Simpan hasil ke outputFilePath
+                } else {
+                    resolve() // Jika bukan video, langsung selesaikan promise
                 }
-                resolve()
             } catch (error) {
-                reject(error)
+                console.error('Error during video processing:', error)
+                reject(error) // Tolak promise jika terjadi kesalahan
             }
         })
-        writer.on('error', reject)
+        writer.on('error', (err) => {
+            console.error('Error writing file:', err)
+            reject(err) // Tolak promise jika terjadi kesalahan saat menulis
+        })
     })
 }
 
