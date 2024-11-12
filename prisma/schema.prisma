@@ -31,7 +31,8 @@ model FolderArsip {
   like           Int
   coment         Int
   created_at     DateTime       @default(now())
-  arsipId        Int
+  status         String         @default("pending")
+  arsipId        Int  
   arsip          Arsip          @relation("ArsipToFolderArsip", fields: [arsipId], references: [id])
   detail_content DetailContent? @relation("FolderArsipToDetailContent")
 }

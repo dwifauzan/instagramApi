@@ -40,18 +40,31 @@ const RepostPage = () => {
                 'http://192.168.18.45:5000/api/v1/users'
             )
             const load = await response.json()
-            const localStorageKeys = Object.keys(localStorage);
+            const localStorageKeys = Object.keys(localStorage)
             const filteredData = load.data.filter((user: any) =>
                 localStorageKeys.includes(user.name)
-            );
+            )
             setLocalData(filteredData)
         } catch (err) {
             console.error(err)
         }
     }
 
-    const getRepostMedia = () => {
-        setMediaFiles('/hexadash-nextjs/repost/media-0.jpg')
+    const getRepostMedia = async () => {
+        const image = '/hexadash-nextjs/repost/media-0.jpg'
+        const video = '/hexadash-nextjs/repost/cover-0.jpg'
+
+        try {
+            const response = await axios.get(image, { responseType: 'blob' })
+            if (response.status == 200) {
+                setMediaFiles(image)
+            } else {
+                setMediaFiles(video)
+            }
+        } catch (err: any) {
+            console.log('tidak ditemukan')
+            setMediaFiles(video)
+        }
     }
 
     useEffect(() => {
@@ -62,13 +75,15 @@ const RepostPage = () => {
     // Fungsi untuk membaca file caption.txt
     const fetchCaptionFromFile = async () => {
         try {
-            const response = await fetch('/hexadash-nextjs/repost/caption.txt')
-            console.log(response)
-            const text = await response.text()
-            setCaptionText(text)
-            form.setFieldsValue({ textareaValue: text }) // Isi textarea dengan teks dari file
+            const response = await axios.get(
+                '/hexadash-nextjs/api/readCaptionRepost'
+            )
+            const result = response.data.content
+            setCaptionText(result)
+            
+        // form.setFieldsValue({ textareaValue: captionText }) // Isi textarea dengan teks dari file
         } catch (error) {
-            console.error("Gagal membaca file caption.txt:", error)
+            console.error('Gagal membaca file caption.txt:', error)
         }
     }
 
@@ -126,7 +141,18 @@ const RepostPage = () => {
                             bordered={false}
                             style={{ borderRadius: 8 }}
                         >
-                            <Form onFinish={handleRepost} layout="vertical">
+                            <Form
+                                onFinish={handleRepost}
+                                layout="vertical"
+                                // initialValues={{
+                                //     textareaValue: captionText,
+                                // }}
+                                // onFieldsChange={() => {
+                                //     form.setFieldsValue({
+                                //         textareaValue: captionText,
+                                //     })
+                                // }}
+                            >
                                 <Form.Item
                                     label="Pilih Akun"
                                     name="accounts"
@@ -167,10 +193,12 @@ const RepostPage = () => {
                                         rows={4}
                                         placeholder="Masukkan teks di sini..."
                                         value={captionText}
+                                        defaultValue={captionText}
                                         onChange={(e) =>
                                             setCaptionText(e.target.value)
                                         }
                                     />
+                                    <p className='hidden'>{captionText}</p>
                                 </Form.Item>
 
                                 <Button
@@ -197,23 +225,43 @@ const RepostPage = () => {
                             </Form>
                         </Card>
                     </Col>
-
                     {/* Preview Media */}
                     <Col sm={12} xs={24}>
                         <Card
                             title="Pratinjau Media"
                             bordered={false}
-                            style={{ borderRadius: 8 }}
+                            style={{
+                                borderRadius: 8,
+                                width: 350,
+                                boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.1)',
+                                overflow: 'hidden',
+                                textAlign: 'center',
+                            }}
                         >
                             {mediaFiles && (
                                 <Image
-                                width={350}
-                                height={450}
+                                    width={350}
+                                    height={350}
+                                    style={{
+                                        objectFit: 'cover',
+                                        borderBottom: '1px solid #e8e8e8',
+                                    }}
                                     src={mediaFiles}
                                     alt="Pratinjau Media"
                                 />
                             )}
-                            <p>{captionText}</p>
+                            <div style={{ padding: '10px', textAlign: 'left' }}>
+                                <p
+                                    style={{
+                                        fontSize: '14px',
+                                        color: '#262626',
+                                        margin: '0',
+                                        lineHeight: '1.5',
+                                    }}
+                                >
+                                    {captionText}
+                                </p>
+                            </div>
                         </Card>
                     </Col>
                 </Row>

@@ -12,6 +12,7 @@ import {
     DatePicker,
     TimePicker,
     Form,
+    Input,
 } from 'antd'
 import DataTable from '@/components/table/DataTable'
 import Link from 'next/link'
@@ -20,6 +21,7 @@ import { PageHeaders } from '@/components/page-headers'
 import { useData } from '@/components/table/detailProvider'
 import axios from 'axios'
 import moment from 'moment'
+import { useNotification } from '../../crud/axios/handler/error'
 
 interface FolderArsip {
     id: number
@@ -28,6 +30,7 @@ interface FolderArsip {
     like: number
     coment: number
     created_at: string
+    status: string
     isExecuted: boolean
 }
 
@@ -74,6 +77,10 @@ function ProjectDetail() {
     const [usersF, setUsersF] = useState<any[]>([]) // facebook
     const [usersI, setUsersI] = useState<[]>([]) // instagram
     const [fSelected, setFSelected] = useState<number>(0)
+
+    const { openNotificationWithIcon, contextHolder } = useNotification()
+    const [modalLoading, setModalLoading] = useState(false)
+    const [refreshData, setRefreshData] = useState(false) // Tambahkan state ini untuk memicu reload DataTable
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -146,6 +153,7 @@ function ProjectDetail() {
 
     const handleSchedule = async (values: any) => {
         console.log(values)
+        setModalLoading(true)
         try {
             const accessToken = usersF.find(
                 (user: any) => user.id === fSelected
@@ -158,6 +166,8 @@ function ProjectDetail() {
                 time: values.schedule_time.format('HH:mm'), // Pastikan waktu tidak null
                 access_token: accessToken,
                 users: values.users_instagram, // Akun Instagram yang dipilih
+                perpostingan: values.batas_postingan,
+                lokasi: values.location
             }
 
             // Mengirimkan payload ke endpoint
@@ -165,15 +175,22 @@ function ProjectDetail() {
                 '/hexadash-nextjs/api/schedule',
                 payload
             )
-
-            console.log('Jadwal berhasil dibuat:', response)
-
-            // Reset form fields setelah pengiriman berhasil
-            setSelectedOption(undefined)
-            setScheduledDate(null)
-            setScheduledTime(null)
-        } catch (err: any) {
-            console.error('Error scheduling:', err)
+            openNotificationWithIcon(
+                'success',
+                'Success Schedule',
+                response.data.message
+            )
+            tableDataSource
+        } catch (error: any) {
+            if (error.reponse)
+                openNotificationWithIcon(
+                    'error',
+                    'Failed Schedule',
+                    error.response.message
+                )
+        }finally{
+            setModalLoading(false)
+            setModalVisible(false)
         }
     }
 
@@ -192,16 +209,32 @@ function ProjectDetail() {
                 like,
                 coment,
                 created_at,
+                status,
                 detail_content,
                 isExecuted,
             } = item
-            const xoxo = detail_content.file_path.split('/')
+            const xoxo = detail_content.file_path?.split('/')
+            console.log(xoxo)
             const felepath = `${xoxo[xoxo.length - 3]}/${
                 xoxo[xoxo.length - 2]
             }/${xoxo[xoxo.length - 1]}`
 
+            //status color kondisi
+            let color = ''
+            switch(status){
+                case 'success':
+                    color = 'green';
+                    break;
+                case 'pending':
+                    color = 'orange';
+                    break;
+                case 'failed':
+                    color = 'red';
+                    break;
+            }
+
             const mediaElement =
-                detail_content.media_type === 1 ? (
+                detail_content?.media_type === 1 ? (
                     <img
                         src={`/hexadash-nextjs/arsip/${felepath}`}
                         alt="media"
@@ -216,16 +249,6 @@ function ProjectDetail() {
                         Your browser does not support the video tag.
                     </video>
                 )
-
-            // Determine status
-            let statusText = 'Pending'
-            let statusColor = 'orange'
-
-            if (isExecuted) {
-                statusText = like > 500 ? 'Success' : 'Failed'
-                statusColor = like > 500 ? 'green' : 'red'
-            }
-
             return {
                 media: mediaElement,
                 caption: (
@@ -256,10 +279,10 @@ function ProjectDetail() {
                 ),
                 status: (
                     <Tag
-                        color={statusColor}
+                        color={color}
                         className="min-h-[24px] px-3 text-xs font-medium rounded-[15px]"
                     >
-                        {statusText}
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
                     </Tag>
                 ),
                 action: (
@@ -289,6 +312,7 @@ function ProjectDetail() {
 
     return (
         <>
+            {contextHolder}
             <PageHeaders
                 routes={PageRoutes}
                 title="Detail Arsip"
@@ -327,102 +351,184 @@ function ProjectDetail() {
 
             {/* Modal for Scheduling */}
             <Modal visible={modalVisible} footer={false}>
-                <div className="px-5 py-3">
-                    <div className="mb-5">
-                        <h1 className="capitalize text-2xl font-semibold">
-                            jadwalkan arsip
-                        </h1>
-                    </div>
-                    <Form
-                        form={form}
-                        layout="vertical"
-                        onFinish={(values) => {
-                            console.log('Form Values:', values) // Debug: Pastikan untuk cek log ini
-                            handleSchedule(values)
-                        }}
-                    >
-                        <Form.Item
-                            name="users_facebook"
-                            label="Akun Facebook"
-                            rules={[
-                                {
-                                    required: true,
-                                    message: 'Pilih akun Facebook!',
-                                },
-                            ]}
+                <Spin spinning={modalLoading} tip="Mohon Tunggu....">
+                    <div className="px-5 py-3">
+                        <div className="mb-5">
+                            <h1 className="capitalize text-2xl font-semibold">
+                                jadwalkan arsip
+                            </h1>
+                        </div>
+                        <Form
+                            form={form}
+                            layout="vertical"
+                            onFinish={(values) => {
+                                handleSchedule(values)
+                            }}
                         >
-                            <Select
-                                placeholder="Select Users Facebook"
-                                onChange={handleSelectF}
+                            <Form.Item
+                                name="users_facebook"
+                                label="Akun Facebook"
+                                rules={[
+                                    {
+                                        required: true,
+                                        message: 'Pilih akun Facebook!',
+                                    },
+                                ]}
                             >
-                                {usersF?.map((user: any) => (
-                                    <Select.Option
-                                        value={user.id}
-                                        key={user.id}
-                                    >
-                                        {user.name}
-                                    </Select.Option>
-                                ))}
-                            </Select>
-                        </Form.Item>
+                                <Select
+                                    placeholder="Select Users Facebook"
+                                    onChange={handleSelectF}
+                                >
+                                    {usersF?.map((user: any) => (
+                                        <Select.Option
+                                            value={user.id}
+                                            key={user.id}
+                                        >
+                                            {user.name}
+                                        </Select.Option>
+                                    ))}
+                                </Select>
+                            </Form.Item>
 
-                        <Form.Item
-                            name="users_instagram"
-                            label="Akun Instagram terkait"
-                            rules={[
-                                {
-                                    required: true,
-                                    message: 'Pilih akun Instagram!',
-                                },
-                            ]}
-                        >
-                            <Select
-                                placeholder="Select Users Instagram"
-                                options={usersI?.map((user: any) => ({
-                                    value: user,
-                                    label: user,
-                                }))}
-                            />
-                        </Form.Item>
+                            <Form.Item
+                                name="users_instagram"
+                                label="Akun Instagram terkait"
+                                rules={[
+                                    {
+                                        required: true,
+                                        message: 'Pilih akun Instagram!',
+                                    },
+                                ]}
+                            >
+                                <Select
+                                    placeholder="Select Users Instagram"
+                                    options={usersI?.map((user: any) => ({
+                                        value: user,
+                                        label: user,
+                                    }))}
+                                />
+                            </Form.Item>
 
-                        <Form.Item
-                            name="schedule_date"
-                            label="Tanggal"
-                            rules={[
-                                {
-                                    required: true,
-                                    message: 'Tentukan tanggal!',
-                                },
-                            ]}
-                        >
-                            <DatePicker
-                                format="DD/MM/YYYY"
-                                className="w-full"
-                            />
-                        </Form.Item>
+                            <Form.Item
+                                name="schedule_date"
+                                label="Tanggal"
+                                rules={[
+                                    {
+                                        required: true,
+                                        message: 'Tentukan tanggal!',
+                                    },
+                                ]}
+                            >
+                                <DatePicker
+                                    format="DD/MM/YYYY"
+                                    className="w-full"
+                                    inputReadOnly
+                                    disabledDate={(current) => {
+                                        // Disable dates before today and more than 30 days from today
+                                        const today = moment().startOf('day')
+                                        const maxDate = moment()
+                                            .add(30, 'days')
+                                            .endOf('day')
+                                        return (
+                                            current &&
+                                            (current < today ||
+                                                current > maxDate)
+                                        )
+                                    }}
+                                />
+                            </Form.Item>
 
-                        <Form.Item
-                            name="schedule_time"
-                            label="Waktu"
-                            rules={[
-                                { required: true, message: 'Tentukan waktu!' },
-                            ]}
-                        >
-                            <TimePicker format="HH:mm" className="w-full" />
-                        </Form.Item>
+                            <Form.Item
+                                name="schedule_time"
+                                label="Waktu"
+                                rules={[
+                                    {
+                                        required: true,
+                                        message: 'Tentukan waktu!',
+                                    },
+                                ]}
+                            >
+                                <TimePicker
+                                    format="HH:mm"
+                                    className="w-full"
+                                    inputReadOnly
+                                    hideDisabledOptions
+                                />
+                            </Form.Item>
 
-                        <Form.Item>
-                            <Button type="primary" htmlType="submit">
-                                Submit
-                            </Button>
-                        </Form.Item>
-                        <Form.Item>
-                            <Button onClick={() => setModalVisible(false)}>
-                                cancel
-                            </Button>
-                        </Form.Item>
-                    </Form>
-                </div>
+                            {/* <Form.Item
+                                name="location"
+                                label="pilih lokasi"
+                                rules={[
+                                    {
+                                        required: true,
+                                        message: 'Tentukan lokasi!',
+                                    },
+                                ]}
+                            >
+                                <Input
+                                    className="w-full"
+                                />
+                            </Form.Item> */}
+
+                            <Form.Item
+                                name="batas_postingan"
+                                label="jumlah perhari postingan"
+                                rules={[
+                                    {
+                                        required: true,
+                                        message:
+                                            'Tentukan jumlah perhari postingan!',
+                                    },
+                                ]}
+                            >
+                                <Input
+                                    className="w-full"
+                                    type="number"
+                                    maxLength={2}
+                                    max={20}
+                                    onInput={(e) => {
+                                        const input =
+                                            e.target as HTMLInputElement
+                                        if (parseInt(input.value) > 20) {
+                                            input.value = '20'
+                                        } else if (input.value.length > 2) {
+                                            input.value = input.value.slice(
+                                                0,
+                                                2
+                                            )
+                                        }
+                                        if (
+                                            (e.target as HTMLInputElement).value
+                                                .length > 2
+                                        ) {
+                                            ;(
+                                                e.target as HTMLInputElement
+                                            ).value = (
+                                                e.target as HTMLInputElement
+                                            ).value.slice(0, 2)
+                                        }
+                                    }}
+                                />
+                            </Form.Item>
+
+                            <Form.Item>
+                                <Button
+                                    type="primary"
+                                    htmlType="submit"
+                                    loading={modalLoading}
+                                >
+                                    Submit
+                                </Button>
+                            </Form.Item>
+                            <Form.Item>
+                                <Button onClick={() => setModalVisible(false)}>
+                                    cancel
+                                </Button>
+                            </Form.Item>
+                        </Form>
+                    </div>
+                </Spin>
             </Modal>
         </>
     )

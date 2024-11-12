@@ -2,6 +2,8 @@ import * as puppeteer from 'puppeteer'
 import fs from 'fs'
 import path from 'path'
 import { NextApiRequest, NextApiResponse } from 'next'
+import { parse, format, addDays } from 'date-fns'
+import { PrismaClient } from '@prisma/client'
 
 interface DetailContent {
     id: number
@@ -23,63 +25,133 @@ interface FolderArsip {
 const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     if (req.method === 'POST') {
         try {
-            const { folderArsip, access_token, date, time, users } = req.body
+            const {
+                folderArsip,
+                access_token,
+                date,
+                time,
+                users,
+                perpostingan,
+                lokasi,
+            } = req.body
+            const uniqueFolderIds = new Set(
+                folderArsip.map(
+                    (item: any) => item.detail_content.folderArsipId
+                )
+            )
+            const totalFolders = uniqueFolderIds.size
+            console.log(totalFolders)
 
             const browser = await puppeteer.launch({ headless: false })
             const page = await browser.newPage()
             await page.setViewport({ width: 1366, height: 768 })
+            const cookiesReady = JSON.parse(access_token)
+            await page.setCookie(...cookiesReady)
 
-            for (const item of folderArsip) {
-                await new Promise((resolve) => setTimeout(resolve, 3000))
-                const cookiesReady = JSON.parse(access_token)
-                await page.setCookie(...cookiesReady)
-                await page.goto(
-                    'https://business.facebook.com/latest/composer',
-                    {
-                        waitUntil: 'networkidle2',
-                    }
-                )
-                await new Promise((resolve) => setTimeout(resolve, 2000))
-                await page.click('[role="combobox"]')
-                const options = await page.$$('[role="option"]')
+            //fungsi untuk update columns status folderArsip
 
-                for (const option of options) {
-                    const text = await option.evaluate((el) =>
-                        el.textContent?.trim()
-                    )
-                    if (text && !users.includes(text)) await option.click()
+            const prisma = new PrismaClient()
+            const updateFolderArsip = async (
+                folderArsipId: number,
+                status: string
+            ) => {
+                try {
+                    await prisma.folderArsip.update({
+                        where: {
+                            id: folderArsipId,
+                        },
+                        data: {
+                            status: status
+                        }
+                    })
+                    console.log(`Status updated to ${status} for folderArsipId: ${folderArsipId}`);
+                } catch (err: any) {
+                    console.error('Error updating status:', err);
                 }
-                await page.click('[role="combobox"]')
-                await new Promise((resolve) => setTimeout(resolve, 3000))
+            }
 
-                const mediaFilePath = path.join(item.detail_content.file_path)
+            let processInterupt = false
+            page.on('dialog', async (dialog) => {
+                if (dialog.type() === 'beforeunload') {
+                    await dialog.accept()
+                } else {
+                    await dialog.dismiss()
+                }
+            })
+            try {
+                let writePostingan = 0
+                let parseDate = parse(date, 'dd/mm/yyyy', new Date())
+                const formatDate = format(parseDate, 'dd/mm/yyyy')
+                let postsToday = 0
+                for (const item of folderArsip) {
+                    if (totalFolders <= perpostingan) break
 
-                if (fs.existsSync(mediaFilePath)) {
-                    // membaca isi filepath
-                    // Pastikan mediaDirectoryPath mengarah ke folder
-                    const mediaDirectoryPath = fs
-                        .statSync(item.detail_content.file_path)
-                        .isDirectory()
-                        ? item.detail_content.file_path
-                        : path.dirname(item.detail_content.file_path)
-
-                    const files = fs.readdirSync(mediaDirectoryPath)
-                    const splitPath = mediaFilePath.split('/')
-                    splitPath.pop()
-                    const resultPath = splitPath.join('/')
-                    for(const file of files){
-                        const finalPath = path.join(resultPath, file)
-                        const [fileChooser] = await Promise.all([
-                            page.waitForFileChooser(),
-                            page.click('[role="button"]'), // Tombol untuk memilih file
-                        ])
-                        await fileChooser.accept([finalPath])
-                        console.log(
-                            `File ${file} berhasil diunggah`
-                        )
+                    if (postsToday >= perpostingan) {
+                        parseDate = addDays(parseDate, 1)
+                        postsToday = 0 //reset
                     }
-                    await new Promise((resolve) => setTimeout(resolve, 2000))
 
+                    const formatDate = format(parseDate, 'dd/mm/yyyy')
+                    console.log('date before xpath : ', formatDate)
+
+                    await new Promise((resolve) => setTimeout(resolve, 3000))
+                    await page.goto(
+                        'https://business.facebook.com/latest/composer',
+                        {
+                            waitUntil: 'networkidle2',
+                        }
+                    )
+                    await new Promise((resolve) => setTimeout(resolve, 2000))
+                    await page.click('[role="combobox"]')
+                    const options = await page.$$('[role="option"]')
+
+                    for (const option of options) {
+                        const text = await option.evaluate((el) =>
+                            el.textContent?.trim()
+                        )
+                        if (text && !users.includes(text)) await option.click()
+                    }
+                    await page.click('[role="combobox"]')
+                    await new Promise((resolve) => setTimeout(resolve, 3000))
+
+                    const mediaFilePath = path.join(
+                        item.detail_content.file_path
+                    )
+
+                    if (fs.existsSync(mediaFilePath)) {
+                        // membaca isi filepath
+                        // Pastikan mediaDirectoryPath mengarah ke folder
+                        const mediaDirectoryPath = fs
+                            .statSync(item.detail_content.file_path)
+                            .isDirectory()
+                            ? item.detail_content.file_path
+                            : path.dirname(item.detail_content.file_path)
+
+                        const files = fs.readdirSync(mediaDirectoryPath)
+                        const splitPath = mediaFilePath.split('/')
+                        splitPath.pop()
+                        const resultPath = splitPath.join('/')
+                        for (const file of files) {
+                            const finalPath = path.join(resultPath, file)
+                            const [fileChooser] = await Promise.all([
+                                page.waitForFileChooser(),
+                                page.click('[role="button"]'), // Tombol untuk memilih file
+                            ])
+                            await fileChooser.accept([finalPath])
+                            console.log(`File ${file} berhasil diunggah`)
+                            // await new Promise((resolve) =>
+                            //     setTimeout(resolve, 1500)
+                            // )
+                        }
+                        // await new Promise((resolve) =>
+                        //     setTimeout(resolve, 2000)
+                        // )
+                    } else {
+                        console.error(`File tidak ditemukan: ${mediaFilePath}`)
+                        return res
+                            .status(500)
+                            .json({ message: 'File tidak ditemukan' })
+                    }
                     // Masukkan caption ke dalam textarea
                     const textareaSelector = '[data-text="true"]'
                     const textareaElement = await page.$(textareaSelector)
@@ -89,6 +161,46 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
                             textareaElement
                         )
                         await page.type(textareaSelector, item.caption)
+                    }
+                    await new Promise((resolve) => setTimeout(resolve, 2000))
+
+                    const locationPath =
+                        '[aria-label="Location"][role="button"]'
+                    const locationWait = await page.$$(locationPath)
+                    let foundLocation = false
+
+                    for (const buttonLocation of locationWait) {
+                        const buttonText = await page.evaluate((el) => {
+                            if (el instanceof HTMLElement) {
+                                return el.textContent
+                                    ? el.textContent.trim()
+                                    : ''
+                            }
+                            return ''
+                        }, buttonLocation)
+
+                        // Pastikan teksnya sesuai dengan apa yang diinginkan
+                        if (buttonText === 'Enter a location') {
+                            // Tunggu elemen sebelum mengkliknya (jika perlu)
+                            await page.waitForSelector(locationPath)
+                            await buttonLocation.click() // klik sekali untuk membuka modal
+                            console.log('Lokasi button clicked')
+
+                            // Tunggu input field dalam modal muncul
+                            const inputSelector =
+                                '[aria-label="Location input"]' // Gantilah dengan selector yang sesuai
+                            await page.waitForSelector(inputSelector)
+
+                            // Masukkan lokasi
+                            await page.type(inputSelector, lokasi)
+                            console.log('Lokasi berhasil dimasukkan')
+                            foundLocation = true
+                            break
+                        }
+                    }
+
+                    if (!foundLocation) {
+                        console.log('Lokasi tidak ditemukan')
                     }
 
                     // Klik tombol untuk menjadwalkan
@@ -125,30 +237,51 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
                         const dateInput = await page.$(planning.date)
                         if (dateInput) {
                             await dateInput.click({ clickCount: 3 })
-                            await dateInput.type(date)
-                            console.log('Date successfully filled.')
+                            await dateInput.type(formatDate)
+                            console.log('date in xpath : ', formatDate)
                         }
                         await new Promise((resolve) =>
                             setTimeout(resolve, 2000)
                         )
 
-                        let [hours, minutes] = time.split(':')
+                        let [hours, minutes] = time.split(':').map(Number) // Konversi hours dan minutes ke angka
+
+                        // Total waktu dalam menit, lalu tambahkan 30 menit untuk penjadwalan berikutnya
+                        let totalMinutes =
+                            hours * 60 + minutes + postsToday * 30
+
+                        // Konversi kembali ke jam dan menit
+                        hours = Math.floor(totalMinutes / 60) % 24 // Mod 24 untuk memastikan dalam format 24 jam
+                        minutes = totalMinutes % 60
+
+                        // Format `hours` dan `minutes` menjadi dua digit untuk pengisian
+                        const formattedHours = String(hours).padStart(2, '0')
+                        const formattedMinutes = String(minutes).padStart(
+                            2,
+                            '0'
+                        )
+
+                        console.log(
+                            `Scheduling post for hours: ${formattedHours}, minutes: ${formattedMinutes}`
+                        )
+
+                        // Kemudian isi field input dengan `formattedHours` dan `formattedMinutes`
                         const hoursInput = await page.$(planning.hours)
                         if (hoursInput) {
                             await hoursInput.click({ clickCount: 3 })
-                            await hoursInput.type(
-                                String(hours).padStart(2, '0')
-                            )
+                            await hoursInput.type(formattedHours)
                             console.log('Hours successfully filled.')
+                        } else {
+                            console.log('Hours input not found')
                         }
 
                         const minutesInput = await page.$(planning.minutes)
                         if (minutesInput) {
                             await minutesInput.click({ clickCount: 3 })
-                            await minutesInput.type(
-                                String(minutes).padStart(2, '0')
-                            )
+                            await minutesInput.type(formattedMinutes)
                             console.log('Minutes successfully filled.')
+                        } else {
+                            console.log('Minutes input not found')
                         }
                     } else {
                         console.log(
@@ -176,7 +309,10 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
                             break
                         }
                     }
-
+                    processInterupt = false
+                    console.log('date out xpath : ', formatDate)
+                    postsToday++
+                    await updateFolderArsip(item.detail_content.folderArsipId, 'success');
                     // Tunggu sebentar sebelum melanjutkan ke post berikutnya
                     await new Promise((resolve) => setTimeout(resolve, 5000))
 
@@ -186,20 +322,19 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
                             waitUntil: 'networkidle2',
                         }
                     )
-                } else {
-                    console.error(`File tidak ditemukan: ${mediaFilePath}`)
-                    return res
-                        .status(500)
-                        .json({ message: 'File tidak ditemukan' })
                 }
-            }
 
-            await browser.close()
-            return res.status(200).json({ message: 'Scheduled successfully' })
+                await browser.close()
+                return res
+                    .status(200)
+                    .json({ message: 'Scheduled successfully' })
+            } catch (error: any) {
+                processInterupt = true
+            }
         } catch (error: any) {
             console.error('Error in scheduling:', error)
             return res.status(500).json({
-                message: 'Internal Server Error',
+                message: 'terjadi kesalahan saat schedule',
                 error: error.message,
             })
         }
