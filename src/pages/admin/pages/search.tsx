@@ -55,15 +55,15 @@ function SearchResult() {
 
     const fetchFeeds = useCallback(async (query: string) => {
         setLoading(true)
+        const chache = sessionStorage.getItem(query)
+        if (chache) {
+            setTimeout(() => {
+                processAllSearchData(JSON.parse(chache))
+                setLoading(false)
+                return 0
+            }, 1000)
+        }
         try {
-            const chache = sessionStorage.getItem(query)
-            if (chache) {
-                setTimeout(() => {
-                    processAllSearchData(JSON.parse(chache))
-                    setLoading(false)
-                    return
-                }, 1000)
-            }
             console.log(localStorage.key(0))
             const token = localStorage.getItem(localStorage.key(0)!)
 
