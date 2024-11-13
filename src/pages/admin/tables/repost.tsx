@@ -79,9 +79,8 @@ const RepostPage = () => {
                 '/hexadash-nextjs/api/readCaptionRepost'
             )
             const result = response.data.content
-            setCaptionText(result)
-            
-        // form.setFieldsValue({ textareaValue: captionText }) // Isi textarea dengan teks dari file
+            setCaptionText(result) // Pastikan ini benar
+            form.setFieldsValue({ textareaValue: result }) // Mengisi textarea
         } catch (error) {
             console.error('Gagal membaca file caption.txt:', error)
         }
@@ -134,7 +133,7 @@ const RepostPage = () => {
         <div>
             {contextHolder}
             <main className="min-h-[715px] lg:min-h-[580px] bg-transparent px-8 pb-12">
-                <Row gutter={25}>
+                <Row gutter={25} className="mt-6">
                     <Col sm={12} xs={18}>
                         <Card
                             title="Repost"
@@ -144,14 +143,9 @@ const RepostPage = () => {
                             <Form
                                 onFinish={handleRepost}
                                 layout="vertical"
-                                // initialValues={{
-                                //     textareaValue: captionText,
-                                // }}
-                                // onFieldsChange={() => {
-                                //     form.setFieldsValue({
-                                //         textareaValue: captionText,
-                                //     })
-                                // }}
+                                initialValues={{
+                                    textareaValue: captionText, // Ini hanya untuk inisialisasi
+                                }}
                             >
                                 <Form.Item
                                     label="Pilih Akun"
@@ -179,31 +173,20 @@ const RepostPage = () => {
                                     </Select>
                                 </Form.Item>
 
-                                <Form.Item
-                                    label="Masukkan Teks"
-                                    name="textareaValue"
-                                    rules={[
-                                        {
-                                            required: true,
-                                            message: 'Silakan masukkan teks!',
-                                        },
-                                    ]}
-                                >
-                                    <Input.TextArea
-                                        rows={4}
-                                        placeholder="Masukkan teks di sini..."
-                                        value={captionText}
-                                        defaultValue={captionText}
-                                        onChange={(e) =>
-                                            setCaptionText(e.target.value)
-                                        }
-                                    />
-                                    <p className='hidden'>{captionText}</p>
-                                </Form.Item>
+                                <Input.TextArea
+                                    rows={12}
+                                    placeholder="Masukkan caption di sini..."
+                                    value={captionText}
+                                    onChange={(e) =>
+                                        setCaptionText(e.target.value)
+                                    }
+                                    className="text-base"
+                                />
 
                                 <Button
                                     type="dashed"
                                     onClick={fetchCaptionFromFile}
+                                    className="mt-2"
                                 >
                                     Gunakan Caption
                                 </Button>
@@ -229,36 +212,17 @@ const RepostPage = () => {
                     <Col sm={12} xs={24}>
                         <Card
                             title="Pratinjau Media"
-                            bordered={false}
-                            style={{
-                                borderRadius: 8,
-                                width: 350,
-                                boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.1)',
-                                overflow: 'hidden',
-                                textAlign: 'center',
-                            }}
+                            className="max-w-[450px] aspect-square rounded-lg shadow-md"
                         >
                             {mediaFiles && (
                                 <Image
-                                    width={350}
-                                    height={350}
-                                    style={{
-                                        objectFit: 'cover',
-                                        borderBottom: '1px solid #e8e8e8',
-                                    }}
+                                    className="w-full"
                                     src={mediaFiles}
                                     alt="Pratinjau Media"
                                 />
                             )}
-                            <div style={{ padding: '10px', textAlign: 'left' }}>
-                                <p
-                                    style={{
-                                        fontSize: '14px',
-                                        color: '#262626',
-                                        margin: '0',
-                                        lineHeight: '1.5',
-                                    }}
-                                >
+                            <div className="p-2 text-left">
+                                <p className="line-clamp-4 text-base">
                                     {captionText}
                                 </p>
                             </div>
@@ -271,14 +235,15 @@ const RepostPage = () => {
                 visible={isModalVisible}
                 footer={null}
                 maskClosable={false}
-                style={{ borderRadius: 12 }}
-                bodyStyle={{
+                style={{
                     borderRadius: 12,
                     padding: '20px',
                     boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
                 }}
             >
-                <Spin tip="Menunggu..." spinning={formLoading} />
+                <div style={{ borderRadius: 12, padding: '20px' }}>
+                    <Spin tip="Menunggu..." spinning={formLoading} />
+                </div>
             </Modal>
         </div>
     )

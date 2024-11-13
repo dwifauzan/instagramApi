@@ -129,58 +129,115 @@ const downloadFile = async (
     index = 0,
     isCarousel = false
 ) => {
-    const response = await axios.get(url, { responseType: 'stream' })
-    const fileExtension =
-        mediaType === 'photo' ? '.jpg' : mediaType === 'video' ? '.mp4' : ''
-    const originalFileName = `untitled${
-        isCarousel ? `-${index + 1}` : ''
-    }${fileExtension}`
-    const originalFilePath = join(folderPath, originalFileName)
+    try {
+        const response = await axios.get(url, { responseType: 'stream' })
+        const fileExtension = mediaType === 'photo' ? '.jpg' : mediaType === 'video' ? '.mp4' : ''
+        const originalFileName = `untitled${isCarousel ? `-${index + 1}` : ''}${fileExtension}`
+        const tempFilePath = join(folderPath, `temp-${originalFileName}`)
+        const originalFilePath = join(folderPath, originalFileName)
+        const outputFilePath = join(folderPath, `${originalFileName}`)
 
-    const writer = createWriteStream(originalFilePath)
-    response.data.pipe(writer)
+        // Tulis file yang didownload ke temporary file
+        const writer = createWriteStream(tempFilePath)
+        response.data.pipe(writer)
 
-    return new Promise((resolve, reject) => {
-        writer.on('finish', async () => {
-            try {
-                if (mediaType === 'video') {
-                    const outputFilePath = join(
-                        folderPath,
-                        `resized-${originalFileName}`
-                    )
+        return new Promise((resolve, reject) => {
+            writer.on('finish', async () => {
+                try {
+                    // Cek ukuran file
+                    const stats = await fs.stat(tempFilePath)
+                    if (stats.size === 0) {
+                        throw new Error('Downloaded file is empty')
+                    }
 
-                    // Menggunakan fluent-ffmpeg untuk mengubah ukuran video
-                    ffmpeg(originalFilePath)
-                        .outputOptions([
-                            '-vf',
-                            'scale=1080:-1, pad=1080:1350:(1080-iw)/2:(1350-ih)/2', // Mengubah ukuran video menjadi 4:5
-                            '-c:a',
-                            'copy',
-                        ])
-                        .on('end', () => {
-                            console.log(
-                                `Video resized successfully: ${outputFilePath}`
-                            )
-                            resolve() // Selesaikan promise setelah selesai
+                    if (mediaType === 'video') {
+                        // Konfigurasi FFmpeg yang lebih sederhana
+                        ffmpeg(tempFilePath)
+                            .outputOptions([
+                                '-vf', 'scale=1080:1350', // Simple scaling
+                                '-c:v', 'libx264',        // Video codec
+                                '-c:a', 'copy'           // Copy audio stream
+                            ])
+                            .on('start', (commandLine) => {
+                                console.log('FFmpeg started:', commandLine)
+                            })
+                            .on('progress', (progress) => {
+                                console.log('Processing:', progress.percent, '% done')
+                            })
+                            .on('error', (err) => {
+                                console.error('FFmpeg error:', err)
+                                reject(err)
+                            })
+                            .on('end', async () => {
+                                try {
+                                    console.log('Video processing completed')
+                                    
+                                    // Simpan ke database
+                                    const existingDetail = await prisma.detailContent.findFirst({
+                                        where: { 
+                                            folderArsipId: arsipId,
+                                            media_type: type 
+                                        }
+                                    })
+
+                                    if (!existingDetail) {
+                                        await prisma.detailContent.create({
+                                            data: {
+                                                file_path: outputFilePath,
+                                                media_type: type,
+                                                folderArsipId: arsipId,
+                                            },
+                                        })
+                                    }
+
+                                    // Bersihkan file temporary
+                                    await fs.remove(tempFilePath)
+                                    resolve()
+                                } catch (error) {
+                                    console.error('Error after processing:', error)
+                                    reject(error)
+                                }
+                            })
+                            .save(outputFilePath)
+                    } else {
+                        // Untuk file foto, langsung pindahkan
+                        await fs.move(tempFilePath, originalFilePath, { overwrite: true })
+                        
+                        const existingDetail = await prisma.detailContent.findFirst({
+                            where: { 
+                                folderArsipId: arsipId,
+                                media_type: type 
+                            }
                         })
-                        .on('error', (err) => {
-                            console.error(`FFmpeg error: ${err.message}`)
-                            reject(err) // Tolak promise jika ada kesalahan
-                        })
-                        .save(outputFilePath) // Simpan hasil ke outputFilePath
-                } else {
-                    resolve() // Jika bukan video, langsung selesaikan promise
+
+                        if (!existingDetail) {
+                            await prisma.detailContent.create({
+                                data: {
+                                    file_path: originalFilePath,
+                                    media_type: type,
+                                    folderArsipId: arsipId,
+                                },
+                            })
+                        }
+                        resolve()
+                    }
+                } catch (error) {
+                    console.error('Error processing file:', error)
+                    await fs.remove(tempFilePath).catch(console.error)
+                    reject(error)
                 }
-            } catch (error) {
-                console.error('Error during video processing:', error)
-                reject(error) // Tolak promise jika terjadi kesalahan
-            }
+            })
+
+            writer.on('error', async (err) => {
+                console.error('Write stream error:', err)
+                await fs.remove(tempFilePath).catch(console.error)
+                reject(err)
+            })
         })
-        writer.on('error', (err) => {
-            console.error('Error writing file:', err)
-            reject(err) // Tolak promise jika terjadi kesalahan saat menulis
-        })
-    })
+    } catch (error) {
+        console.error('Download error:', error)
+        throw error
+    }
 }
 
 ipcMain.handle('getFeedData', async () => {

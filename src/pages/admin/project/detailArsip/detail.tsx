@@ -22,6 +22,7 @@ import { useData } from '@/components/table/detailProvider'
 import axios from 'axios'
 import moment from 'moment'
 import { useNotification } from '../../crud/axios/handler/error'
+import LocationInput from '../../../../lib/auto-complete-input'
 
 interface FolderArsip {
     id: number
@@ -86,10 +87,11 @@ function ProjectDetail() {
         const timer = setTimeout(() => {
             setDelayedData(data?.folder_arsip || [])
             setLoading(false)
+            setRefreshData(false)
         }, 2000)
 
         return () => clearTimeout(timer)
-    }, [data])
+    }, [data, refreshData])
 
     useEffect(() => {
         const getUsers = async () => {
@@ -167,7 +169,7 @@ function ProjectDetail() {
                 access_token: accessToken,
                 users: values.users_instagram, // Akun Instagram yang dipilih
                 perpostingan: values.batas_postingan,
-                lokasi: values.location
+                location: values.locations, // Tambahkan lokasi ke payload
             }
 
             // Mengirimkan payload ke endpoint
@@ -180,7 +182,8 @@ function ProjectDetail() {
                 'Success Schedule',
                 response.data.message
             )
-            tableDataSource
+            form.resetFields()
+            setRefreshData(true)
         } catch (error: any) {
             if (error.reponse)
                 openNotificationWithIcon(
@@ -188,9 +191,11 @@ function ProjectDetail() {
                     'Failed Schedule',
                     error.response.message
                 )
-        }finally{
+            setRefreshData(true)
+        } finally {
             setModalLoading(false)
             setModalVisible(false)
+            setRefreshData(true)
         }
     }
 
@@ -213,28 +218,27 @@ function ProjectDetail() {
                 detail_content,
                 isExecuted,
             } = item
-            const xoxo = detail_content.file_path?.split('/')
-            console.log(xoxo)
+            const xoxo = detail_content.file_path.split('/')
             const felepath = `${xoxo[xoxo.length - 3]}/${
                 xoxo[xoxo.length - 2]
             }/${xoxo[xoxo.length - 1]}`
 
             //status color kondisi
             let color = ''
-            switch(status){
+            switch (status) {
                 case 'success':
-                    color = 'green';
-                    break;
+                    color = 'green'
+                    break
                 case 'pending':
-                    color = 'orange';
-                    break;
+                    color = 'orange'
+                    break
                 case 'failed':
-                    color = 'red';
-                    break;
+                    color = 'red'
+                    break
             }
 
             const mediaElement =
-                detail_content?.media_type === 1 ? (
+                detail_content.media_type === 1 ? (
                     <img
                         src={`/hexadash-nextjs/arsip/${felepath}`}
                         alt="media"
@@ -456,20 +460,18 @@ function ProjectDetail() {
                                 />
                             </Form.Item>
 
-                            {/* <Form.Item
-                                name="location"
-                                label="pilih lokasi"
+                            <Form.Item
+                                name="locations"
+                                label="Lokasi"
                                 rules={[
                                     {
-                                        required: true,
+                                        required: false,
                                         message: 'Tentukan lokasi!',
                                     },
                                 ]}
                             >
-                                <Input
-                                    className="w-full"
-                                />
-                            </Form.Item> */}
+                                <LocationInput placeholder="Cari lokasi..." />
+                            </Form.Item>
 
                             <Form.Item
                                 name="batas_postingan"

@@ -61,7 +61,6 @@ function BlogTwo() {
 
     const path = '/admin'
 
-
     useEffect(() => {
         if (router.query.name) {
             hastagsFeeds()
@@ -72,18 +71,20 @@ function BlogTwo() {
         if (isLoadingMore) return
         setIsLoadingMore(true)
         try {
-            const token = localStorage.getItem(localStorage.key(0)!)
+            const token = localStorage.getItem('defaultAccount')
             if (!token) {
                 openNotificationWithIcon(
                     'error',
-                    'Failed to load',
-                    'Session expired. Please login again'
+                    'Token tidak ditemukan',
+                    'Token tidak ditemukan, harap login kembali.'
                 )
-                return
+                throw new Error('Token tidak ditemukan, harap login kembali.')
             }
+            const getToken = localStorage.getItem(token)
+
             const response = await axios.get(
                 `http://192.168.18.45:5000/api/v1/feeds/hastag/${router.query.name}?next_max_id=${nextMaxPage}`,
-                { headers: { Authorization: `Bearer ${token}` } }
+                { headers: { Authorization: `Bearer ${getToken}` } }
             )
             if (Array.isArray(response.data.data)) {
                 setFeeds((prevFeeds) => [...prevFeeds, ...response.data.data])
@@ -119,11 +120,12 @@ function BlogTwo() {
             if (!token) {
                 openNotificationWithIcon(
                     'error',
-                    'Failed to load',
-                    'Session expired. Please login again'
+                    'Token tidak ditemukan',
+                    'Token tidak ditemukan, harap login kembali.'
                 )
-                return
+                throw new Error('Token tidak ditemukan, harap login kembali.')
             }
+
             const response = await axios.get(
                 `http://192.168.18.45:5000/api/v1/feeds/hastag/${router.query.name}?next_max_id=${nextMaxPage}`,
                 { headers: { Authorization: `Bearer ${token}` } }

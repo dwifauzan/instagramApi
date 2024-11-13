@@ -32,7 +32,7 @@ model FolderArsip {
   coment         Int
   created_at     DateTime       @default(now())
   status         String         @default("pending")
-  arsipId        Int  
+  arsipId        Int
   arsip          Arsip          @relation("ArsipToFolderArsip", fields: [arsipId], references: [id])
   detail_content DetailContent? @relation("FolderArsipToDetailContent")
 }

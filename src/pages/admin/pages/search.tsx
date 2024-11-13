@@ -60,13 +60,11 @@ function SearchResult() {
             setTimeout(() => {
                 processAllSearchData(JSON.parse(chache))
                 setLoading(false)
-                return 0
+                return
             }, 1000)
         }
         try {
-            console.log(localStorage.key(0))
-            const token = localStorage.getItem(localStorage.key(0)!)
-
+            const token = localStorage.getItem('defaultAccount')
             if (!token) {
                 // Jika token tidak ditemukan, lemparkan error
                 openNotificationWithIcon(
@@ -76,12 +74,13 @@ function SearchResult() {
                 )
                 throw new Error('Token tidak ditemukan, harap login kembali.')
             }
+            const getToken = localStorage.getItem(token)
 
             const response = await axios.get(
                 `http://192.168.18.45:5000/api/v1/search?q=${query}`,
                 {
                     headers: {
-                        Authorization: `Bearer ${token}`,
+                        Authorization: `Bearer ${getToken}`,
                     },
                 }
             )

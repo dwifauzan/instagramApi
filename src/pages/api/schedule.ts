@@ -61,12 +61,14 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
                             id: folderArsipId,
                         },
                         data: {
-                            status: status
-                        }
+                            status: status,
+                        },
                     })
-                    console.log(`Status updated to ${status} for folderArsipId: ${folderArsipId}`);
+                    console.log(
+                        `Status updated to ${status} for folderArsipId: ${folderArsipId}`
+                    )
                 } catch (err: any) {
-                    console.error('Error updating status:', err);
+                    console.error('Error updating status:', err)
                 }
             }
 
@@ -78,14 +80,12 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
                     await dialog.dismiss()
                 }
             })
-            try {
-                let writePostingan = 0
-                let parseDate = parse(date, 'dd/mm/yyyy', new Date())
-                const formatDate = format(parseDate, 'dd/mm/yyyy')
-                let postsToday = 0
-                for (const item of folderArsip) {
-                    if (totalFolders <= perpostingan) break
-
+            let writePostingan = 0
+            let parseDate = parse(date, 'dd/mm/yyyy', new Date())
+            const formatDate = format(parseDate, 'dd/mm/yyyy')
+            let postsToday = 0
+            for (const item of folderArsip) {
+                try {
                     if (postsToday >= perpostingan) {
                         parseDate = addDays(parseDate, 1)
                         postsToday = 0 //reset
@@ -169,35 +169,37 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
                     const locationWait = await page.$$(locationPath)
                     let foundLocation = false
 
-                    for (const buttonLocation of locationWait) {
-                        const buttonText = await page.evaluate((el) => {
-                            if (el instanceof HTMLElement) {
-                                return el.textContent
-                                    ? el.textContent.trim()
-                                    : ''
-                            }
-                            return ''
-                        }, buttonLocation)
+                    await locationWait.click()
 
-                        // Pastikan teksnya sesuai dengan apa yang diinginkan
-                        if (buttonText === 'Enter a location') {
-                            // Tunggu elemen sebelum mengkliknya (jika perlu)
-                            await page.waitForSelector(locationPath)
-                            await buttonLocation.click() // klik sekali untuk membuka modal
-                            console.log('Lokasi button clicked')
+                    // for (const buttonLocation of locationWait) {
+                    //     const buttonText = await page.evaluate((el) => {
+                    //         if (el instanceof HTMLElement) {
+                    //             return el.textContent
+                    //                 ? el.textContent.trim()
+                    //                 : ''
+                    //         }
+                    //         return ''
+                    //     }, buttonLocation)
 
-                            // Tunggu input field dalam modal muncul
-                            const inputSelector =
-                                '[aria-label="Location input"]' // Gantilah dengan selector yang sesuai
-                            await page.waitForSelector(inputSelector)
+                    //     // Pastikan teksnya sesuai dengan apa yang diinginkan
+                    //     if (buttonText === 'Enter a location') {
+                    //         // Tunggu elemen sebelum mengkliknya (jika perlu)
+                    //         await page.waitForSelector(locationPath)
+                    //         await buttonLocation.click() // klik sekali untuk membuka modal
+                    //         console.log('Lokasi button clicked')
 
-                            // Masukkan lokasi
-                            await page.type(inputSelector, lokasi)
-                            console.log('Lokasi berhasil dimasukkan')
-                            foundLocation = true
-                            break
-                        }
-                    }
+                    //         // Tunggu input field dalam modal muncul
+                    //         const inputSelector =
+                    //             '[aria-label="Location input"]' // Gantilah dengan selector yang sesuai
+                    //         await page.waitForSelector(inputSelector)
+
+                    //         // Masukkan lokasi
+                    //         await page.type(inputSelector, lokasi)
+                    //         console.log('Lokasi berhasil dimasukkan')
+                    //         foundLocation = true
+                    //         break
+                    //     }
+                    // }
 
                     if (!foundLocation) {
                         console.log('Lokasi tidak ditemukan')
@@ -309,10 +311,13 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
                             break
                         }
                     }
+                    await updateFolderArsip(
+                        item.detail_content.folderArsipId,
+                        'success'
+                    )
                     processInterupt = false
                     console.log('date out xpath : ', formatDate)
                     postsToday++
-                    await updateFolderArsip(item.detail_content.folderArsipId, 'success');
                     // Tunggu sebentar sebelum melanjutkan ke post berikutnya
                     await new Promise((resolve) => setTimeout(resolve, 5000))
 
@@ -322,15 +327,17 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
                             waitUntil: 'networkidle2',
                         }
                     )
+                } catch (err: any) {
+                    processInterupt = true
+                    await updateFolderArsip(
+                        item.detail_content.folderArsipId,
+                        'failed'
+                    )
                 }
-
-                await browser.close()
-                return res
-                    .status(200)
-                    .json({ message: 'Scheduled successfully' })
-            } catch (error: any) {
-                processInterupt = true
             }
+
+            await browser.close()
+            return res.status(200).json({ message: 'Scheduled successfully' })
         } catch (error: any) {
             console.error('Error in scheduling:', error)
             return res.status(500).json({

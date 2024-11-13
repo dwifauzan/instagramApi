@@ -7,6 +7,8 @@ import { useNotification } from './handler/error' // Import hook
 import { jwtDecode } from 'jwt-decode' // Import with correct usage
 import { useRouter } from 'next/router'
 import { useCallback } from './handler/callbackRepost' // Import hook
+import { setDefaults } from 'react-i18next'
+import { setTimeout } from 'timers'
 
 interface DataSource {
     id: number
@@ -20,7 +22,9 @@ const NotificationRepost = ({ linkHref }: { linkHref: string }) => {
         <div className="absolute z-40 top-3 right-4 bg-white ps-4 pe-6 py-2 rounded shadow-md text-base">
             <p>Anda sebelumnya sudah mencoba melakukan repost</p>
             <Button className="text-white bg-blue-500 px-6 py-3">
-            <Link href={linkHref} passHref>klik area ini</Link>
+                <Link href={linkHref} passHref>
+                    klik area ini
+                </Link>
             </Button>
         </div>
     )
@@ -45,6 +49,7 @@ function ViewPage() {
     const [confirmSessio, setConfirmSessio] = useState<boolean>(false)
     //search const
     const [searchTerm, setSearchTerm] = useState<string>('')
+    const [defaultAccount, setDefaultAccount] = useState<string | null>(null)
 
     // Fetch data and initialize
     const fetchData = async () => {
@@ -77,6 +82,10 @@ function ViewPage() {
     // Checking which users are logged in from sessionStorage
     useEffect(() => {
         fetchData()
+        const defaultUser = localStorage.getItem('defaultAccount')
+        if (defaultUser) {
+            setCurrentUser(defaultUser)
+        }
     }, [])
     useEffect(() => {
         const readRepost = localStorage.getItem('retry-repost-route')
@@ -121,9 +130,11 @@ function ViewPage() {
         try {
             if (record) {
                 localStorage.removeItem(record) // Hapus token dari sessionStorage
+                localStorage.removeItem('defaultAccount')
                 setLoggedInUsers((prevUsers) =>
                     prevUsers.filter((user) => user.name !== record)
                 ) // Perbarui daftar logged-in users
+                setDefaults(null!)
                 openNotificationWithIcon(
                     'success',
                     'Logout Successful',
@@ -182,7 +193,6 @@ function ViewPage() {
             const tokenDecode = localStorage.getItem(data.name)
             if (tokenDecode) {
                 const jwtSave: { username: string } = jwtDecode(tokenDecode)
-                setCurrentUser(jwtSave.username)
                 setLoggedInUsers((prev) => [
                     ...prev,
                     { name: jwtSave.username },
@@ -193,6 +203,15 @@ function ViewPage() {
                 'Login Successful',
                 'You have logged in successfully.'
             )
+            setTimeout(() => {
+                if (!defaultAccount) {
+                    localStorage.setItem(
+                        'defaultAccount',
+                        selectedRecord?.name!
+                    )
+                    setDefaultAccount(selectedRecord?.name!)
+                }
+            }, 100)
             // Menutup modal setelah login berhasil
             setModalVisible(false)
             fetchData()
@@ -283,19 +302,25 @@ function ViewPage() {
             width: '90px',
             render: (_: any, record: DataSource, i: number) => {
                 const userStatus = loggedInUsers[i]?.name
-                if (userStatus === 'expired' || userStatus === null) {
-                    return (
-                        <Button onClick={() => handleLogin(record)}>
-                            {userStatus === 'expired' ? 'Relogin' : 'Login'}
-                        </Button>
-                    )
-                } else {
-                    return (
-                        <Button onClick={() => handleLogout(record.name)}>
-                            Logout
-                        </Button>
-                    )
-                }
+                return (
+                    <div className="relative">
+                        {/* Tampilkan "default" jika akun adalah akun default */}
+                        {record.name === defaultAccount && (
+                            <Button className="absolute -left-20">
+                                default
+                            </Button>
+                        )}
+                        {userStatus === 'expired' || userStatus === null ? (
+                            <Button onClick={() => handleLogin(record)}>
+                                {userStatus === 'expired' ? 'Relogin' : 'Login'}
+                            </Button>
+                        ) : (
+                            <Button onClick={() => handleLogout(record.name)}>
+                                Logout
+                            </Button>
+                        )}
+                    </div>
+                )
             },
         },
     ]
