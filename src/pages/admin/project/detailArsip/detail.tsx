@@ -56,6 +56,21 @@ interface LocalData {
     isActive: boolean
 }
 
+interface FormValues {
+    users_facebook: string
+    users_instagram: string
+    schedule_date: moment.Moment
+    schedule_time: moment.Moment
+    locations: {
+        name: string
+        location: {
+            lat: number
+            lng: number
+        }
+    }
+    batas_postingan: number
+}
+
 function ProjectDetail() {
     const [form] = Form.useForm()
     const { data } = useData() as any
@@ -153,7 +168,7 @@ function ProjectDetail() {
         { title: 'Actions', dataIndex: 'action', key: 'action', width: '90px' },
     ]
 
-    const handleSchedule = async (values: any) => {
+    const handleSchedule = async (values: FormValues) => {
         console.log(values)
         setModalLoading(true)
         try {
@@ -163,16 +178,21 @@ function ProjectDetail() {
 
             // Menyiapkan payload untuk dikirim ke endpoint
             const payload = {
-                folderArsip: delayedData, // Data folder arsip yang tertunda
-                date: values.schedule_date.format('DD/MM/YYYY'), // Pastikan tanggal tidak null
-                time: values.schedule_time.format('HH:mm'), // Pastikan waktu tidak null
+                folderArsip: delayedData,
+                date: values.schedule_date.format('DD/MM/YYYY'),
+                time: values.schedule_time.format('HH:mm'),
                 access_token: accessToken,
-                users: values.users_instagram, // Akun Instagram yang dipilih
+                users: values.users_instagram,
                 perpostingan: values.batas_postingan,
-                location: values.locations, // Tambahkan lokasi ke payload
+                location: {
+                    name: values.locations.name,
+                    lat: values.locations.location.lat,
+                    lng: values.locations.location.lng,
+                },
             }
 
-            // Mengirimkan payload ke endpoint
+            console.log(payload)
+
             const response = await axios.post(
                 '/hexadash-nextjs/api/schedule',
                 payload
@@ -185,7 +205,7 @@ function ProjectDetail() {
             form.resetFields()
             setRefreshData(true)
         } catch (error: any) {
-            if (error.reponse)
+            if (error.response)
                 openNotificationWithIcon(
                     'error',
                     'Failed Schedule',

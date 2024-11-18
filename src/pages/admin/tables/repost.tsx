@@ -13,6 +13,7 @@ import {
 } from 'antd'
 import axios from 'axios'
 import { useNotification } from '@/pages/admin/crud/axios/handler/error'
+import LocationInput from '@/lib/auto-complete-input'
 
 const { Option } = Select
 
@@ -94,8 +95,8 @@ const RepostPage = () => {
             const data = {
                 id: selectedAccount,
                 caption: captionText,
+                location: values.locations
             }
-            console.log(data.id)
 
             const response = await axios.post(
                 '/hexadash-nextjs/api/repost',
@@ -103,11 +104,11 @@ const RepostPage = () => {
             )
 
             if (response.status !== 200) {
-                const error = response.data
+                const error = response
                 openNotificationWithIcon(
                     'error',
                     'Failed to Repost',
-                    error.message
+                    'error'
                 )
             } else {
                 const result = response.data
@@ -116,12 +117,14 @@ const RepostPage = () => {
                     'Success Repost',
                     result.message
                 )
-
+                
                 form.resetFields()
                 setSelectedAccount('')
             }
         } catch (err: any) {
             localStorage.setItem('retry-repost-route', '/admin/tables/repost')
+            console.log(err)
+
             openNotificationWithIcon('error', 'Failed to Repost', err.message)
         } finally {
             setFormLoading(false)
@@ -191,8 +194,17 @@ const RepostPage = () => {
                                     Gunakan Caption
                                 </Button>
 
-                                <Form.Item label="Lokasi" name="location">
-                                    <Input placeholder="Masukkan lokasi..." />
+                                <Form.Item
+                                    name="locations"
+                                    label="Lokasi"
+                                    rules={[
+                                        {
+                                            required: false,
+                                            message: 'Tentukan lokasi!',
+                                        },
+                                    ]}
+                                >
+                                    <LocationInput placeholder="Cari lokasi..." />
                                 </Form.Item>
 
                                 <Form.Item>

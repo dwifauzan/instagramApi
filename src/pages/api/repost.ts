@@ -12,16 +12,18 @@ export default async function handler(
 ) {
     if (req.method === 'POST') {
         try {
-            const { id, caption } = req.body
+            const { id, caption, location } = req.body
+
             const userResponse = await axios.get(
                 `http://192.168.18.45:5000/api/v1/users/${id}`
             )
             const user = userResponse.data.data
-
+            await new Promise((resolve) => setTimeout(resolve, 2000))
             const result = await repostToInstagram(
                 user.username,
                 user.session,
-                caption
+                caption,
+                location
             )
 
             if (result.success) {
@@ -29,7 +31,7 @@ export default async function handler(
             } else {
                 res.status(500).json({
                     success: false,
-                    error: 'Failed to repost to Instagram',
+                    error: result.error,
                 })
             }
         } catch (error) {
@@ -48,9 +50,11 @@ export default async function handler(
 export const repostToInstagram = async (
     username: string,
     sessionData: any,
-    caption: string
+    caption: string,
+    location: any
 ): Promise<any> => {
     try {
+        await new Promise((resolve) => setTimeout(resolve, 3000))
         ig.state.generateDevice(username)
         await ig.simulate.preLoginFlow()
         await ig.state.deserialize(sessionData.session)
@@ -61,35 +65,62 @@ export const repostToInstagram = async (
         }
 
         await new Promise((resolve) => setTimeout(resolve, 3000))
-
-        const directoryPath = path.join(process.cwd(), 'public', 'repost');
+        const directoryPath = path.join(process.cwd(), 'public', 'repost')
         const files = fs.readdirSync(directoryPath)
 
-        if(files.includes('media-0.mp4')) {
-            const coverImage = fs.readFileSync(path.join(directoryPath, 'cover-0.jpg'))
-            const video = fs.readFileSync(path.join(directoryPath, 'media-0.mp4'))
-            const publish = await ig.publish.video({coverImage , video, caption })
+        const { latitude, longitude, searchQuery } = {
+            latitude: 0.0,
+            longitude: 0.0,
+            // not required
+            searchQuery: 'malang',
+        }
+
+        const locations = await ig.search.location(
+            latitude,
+            longitude,
+            searchQuery
+        )
+
+        const mediaLocation = locations[0]
+        console.log(mediaLocation)
+
+        if (files.includes('media-0.mp4')) {
+            const coverImage = fs.readFileSync(
+                path.join(directoryPath, 'cover-0.jpg')
+            )
+            const video = fs.readFileSync(
+                path.join(directoryPath, 'media-0.mp4')
+            )
+            const publish = await ig.publish.video({
+                coverImage,
+                video,
+                caption,
+                location: mediaLocation,
+            })
             return { success: true, media: publish }
         } else if (files.includes('media-0.jpg')) {
             const mediaPath = path.join(directoryPath, 'media-0.jpg')
             const photo = fs.readFileSync(mediaPath)
-            const publish = await ig.publish.photo({ file: photo, caption })
+            const publish = await ig.publish.photo({
+                // read the file into a Buffer
+                file: photo,
+                // optional, default ''
+                caption,
+                // optional
+                location: mediaLocation,
+            })
             return { success: true, media: publish }
+        } else {
+            return {
+                success: false,
+                error: 'No media files found in the directory',
+            }
         }
     } catch (err: any) {
         console.log(err)
-        let error = {status: err.status || 500, message: err.message}
-        
-        if (err.includes("login_required")) {
-            error.status = 403
-            error.message = "Session expired, please login again"
-        } else if (err.includes("challenge_required")) {
-            error.status = 401
-            error.message = "akun terdeteksi sebagai bot, silahkan selesaikan chalenge"
-        } else if (err.includes("getaddrinfo EAI_AGAIN")) {
-            error.status = 408
-            error.message = "Connection refused, please check your internet connection"
+        return {
+            success: false,
+            error: err.message || 'Internal Server Error',
         }
-        return { success: false, error: error.message }
     }
 }

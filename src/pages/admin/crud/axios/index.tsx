@@ -1,282 +1,97 @@
-import React, { Suspense, useEffect, useState } from 'react'
+import { Button, Form, Input, Modal, Spin, Table } from 'antd'
 import Link from 'next/link'
-import { Row, Col, Table, Spin, Button, Modal, Form, Input } from 'antd'
-import { UilPlus, UilSearch } from '@iconscout/react-unicons'
-import { PageHeaders } from '@/components/page-headers'
-import { useNotification } from './handler/error' // Import hook
-import { jwtDecode } from 'jwt-decode' // Import with correct usage
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { useCallback } from './handler/callbackRepost' // Import hook
-import { setDefaults } from 'react-i18next'
-import { setTimeout } from 'timers'
+import { PageHeaders } from '@/components/page-headers'
+import { UilPlus, UilSearch } from '@iconscout/react-unicons'
+import { instagramApi } from '@/lib/api/instagram'
+import { useInstagram } from '@/hooks/useInstagram'
+import { useNotification } from './handler/error'
 
-interface DataSource {
+interface User {
     id: number
     name: string
     username: string
-    action: JSX.Element
+    status: string
 }
 
-const NotificationRepost = ({ linkHref }: { linkHref: string }) => {
-    return (
-        <div className="absolute z-40 top-3 right-4 bg-white ps-4 pe-6 py-2 rounded shadow-md text-base">
-            <p>Anda sebelumnya sudah mencoba melakukan repost</p>
-            <Button className="text-white bg-blue-500 px-6 py-3">
-                <Link href={linkHref} passHref>
-                    klik area ini
-                </Link>
-            </Button>
-        </div>
-    )
+interface NotificationProps {
+    linkHref: string
 }
 
-function ViewPage() {
+const Notification: React.FC<NotificationProps> = ({ linkHref }) => (
+    <div className="absolute z-40 top-3 right-4 bg-white ps-4 pe-6 py-2 rounded shadow-md text-base">
+        <p>Anda sebelumnya sudah mencoba melakukan repost</p>
+        <Button className="text-white bg-blue-500 px-6 py-3">
+            <Link href={linkHref} passHref>
+                klik area ini
+            </Link>
+        </Button>
+    </div>
+)
+
+const ViewPage: React.FC = () => {
     const router = useRouter()
-    const [dataSource, setDataSource] = useState<DataSource[]>([])
+    const [users, setUsers] = useState<User[]>([])
     const [currentUser, setCurrentUser] = useState<string | null>(null)
-    const [loggedInUsers, setLoggedInUsers] = useState<{ name: string }[]>([])
-    const [isLoading, setIsLoading] = useState<boolean>(true)
-    const [formLoading, setFormLoading] = useState(false)
-    const [loginFailed, setLoginFailed] = useState(false)
-    const [modalVisible, setModalVisible] = useState<boolean>(false)
-    const [selectedRecord, setSelectedRecord] = useState<DataSource | null>(
-        null
-    )
-    const { callbackRepost, contextHolderRepost } = useCallback()
+    const [isLoading, setIsLoading] = useState(true)
+    const [searchTerm, setSearchTerm] = useState('')
+    const [selectedUser, setSelectedUser] = useState<User | null>(null)
+    const [isLoginModalVisible, setIsLoginModalVisible] = useState(false)
     const [isNotified, setIsNotified] = useState(false)
-    const { openNotificationWithIcon, contextHolder } = useNotification() // Use hook
-    //delete modal dan session
-    const [confirmSessio, setConfirmSessio] = useState<boolean>(false)
-    //search const
-    const [searchTerm, setSearchTerm] = useState<string>('')
-    const [defaultAccount, setDefaultAccount] = useState<string | null>(null)
 
-    // Fetch data and initialize
-    const fetchData = async () => {
-        setIsLoading(true)
+    const { openNotificationWithIcon, contextHolder } = useNotification()
+
+    const { login, logout, isLoading: authLoading } = useInstagram()
+
+    useEffect(() => {
+        fetchUsers()
+        checkNotification()
+        getDefaultAccount()
+    }, [])
+
+    const getDefaultAccount = () => {
+        setCurrentUser(localStorage.getItem('default'))
+    }
+
+    const handleSetDefault = (name: string) => {
+        localStorage.setItem('default', name)
+        setCurrentUser(name)
+        openNotificationWithIcon(
+            'success',
+            'Default Account Updated',
+            `${name} has been set as default account`
+        )
+    }
+
+    const fetchUsers = async () => {
         try {
-            const result = await fetch(
-                'http://192.168.18.45:5000/api/v1/users/',
-                {
-                    method: 'GET',
-                    headers: {
-                        'X-License-Key':
-                            'akrmxgkgfkjarhfakzmgakjherfgkaueygzamkhj',
-                    },
-                }
-            )
-            const akhir = await result.json()
-            const modifiedData = akhir.data.map((item: any, index: number) => ({
-                ...item,
-                id: index + 1,
-            }))
-
-            setDataSource(modifiedData)
-            setIsLoading(false)
+            const response = await instagramApi.getUsers()
+            setUsers(response)
         } catch (error) {
-            console.log('Error fetching data:', error)
+            openNotificationWithIcon(
+                'error',
+                'Error',
+                'Failed to load user data. Please try again later.'
+            )
+        } finally {
             setIsLoading(false)
         }
     }
 
-    // Checking which users are logged in from sessionStorage
-    useEffect(() => {
-        fetchData()
-        const defaultUser = localStorage.getItem('defaultAccount')
-        if (defaultUser) {
-            setCurrentUser(defaultUser)
-        }
-    }, [])
-    useEffect(() => {
+    const checkNotification = () => {
         const readRepost = localStorage.getItem('retry-repost-route')
         if (readRepost && !isNotified) {
             setIsNotified(true)
         }
-    }, [])
-
-    useEffect(() => {
-        const loggedIn: any = dataSource.map((user) => {
-            const userToken = localStorage.getItem(user.name)
-            if (userToken === 'expired') {
-                return { name: 'expired' }
-            } else {
-                try {
-                    const jwtSave: any = jwtDecode(userToken!)
-                    return { name: jwtSave.username }
-                } catch (err) {
-                    console.error(err)
-                    return { name: null }
-                }
-            }
-        })
-
-        setLoggedInUsers(loggedIn)
-        console.log(loggedIn)
-    }, [dataSource])
-    // console.log(loggedInUsers)
-
-    const handleLogin = (record: DataSource) => {
-        setSelectedRecord(record)
-        setModalVisible(true)
     }
 
-    useEffect(() => {
-        if (modalVisible && selectedRecord) {
-            console.log('chose: ', selectedRecord)
-        }
-    }, [modalVisible, selectedRecord])
-
-    const handleLogout = async (record: string) => {
-        try {
-            if (record) {
-                localStorage.removeItem(record) // Hapus token dari sessionStorage
-                localStorage.removeItem('defaultAccount')
-                setLoggedInUsers((prevUsers) =>
-                    prevUsers.filter((user) => user.name !== record)
-                ) // Perbarui daftar logged-in users
-                setDefaults(null!)
-                openNotificationWithIcon(
-                    'success',
-                    'Logout Successful',
-                    'You have logged out successfully.'
-                )
-                setIsLoading(false)
-                fetchData()
-            }
-        } catch (error) {
-            console.error('Error during logout:', error)
-            openNotificationWithIcon(
-                'error',
-                'Logout Failed',
-                'An error occurred while logging out.'
-            )
-        }
-    }
-
-    const handlePassword = async (values: any) => {
-        setFormLoading(true)
-        setLoginFailed(false)
-
-        const dataLogin = {
-            username: selectedRecord?.username,
-            password: values.password,
-        }
-        console.log(dataLogin)
-        try {
-            const response = await fetch(
-                'http://192.168.18.45:5000/api/v1/auth/login',
-                {
-                    method: 'POST',
-                    headers: {
-                        'X-License-Key':
-                            'akrmxgkgfkjarhfakzmgakjherfgkaueygzamkhj',
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(dataLogin),
-                }
-            )
-
-            if (!response.ok) {
-                const errorData = await response.text()
-                console.error('Error response:', errorData)
-                setLoginFailed(true)
-                openNotificationWithIcon(
-                    'error',
-                    'Login Failed',
-                    'please try again'
-                )
-                return
-            }
-
-            const data = await response.json()
-            localStorage.setItem(data.currentUser, data.token)
-            const tokenDecode = localStorage.getItem(data.name)
-            if (tokenDecode) {
-                const jwtSave: { username: string } = jwtDecode(tokenDecode)
-                setLoggedInUsers((prev) => [
-                    ...prev,
-                    { name: jwtSave.username },
-                ])
-            }
-            openNotificationWithIcon(
-                'success',
-                'Login Successful',
-                'You have logged in successfully.'
-            )
-            setTimeout(() => {
-                if (!defaultAccount) {
-                    localStorage.setItem(
-                        'defaultAccount',
-                        selectedRecord?.name!
-                    )
-                    setDefaultAccount(selectedRecord?.name!)
-                }
-            }, 100)
-            // Menutup modal setelah login berhasil
-            setModalVisible(false)
-            fetchData()
-        } catch (err) {
-            console.error('Error:', err)
-            setLoginFailed(true)
-            openNotificationWithIcon(
-                'error',
-                'Login Failed',
-                'Username or password is incorrect. Please try again.'
-            )
-        } finally {
-            setFormLoading(false)
-        }
-    }
-
-    //modal trigger modal detele sessio
-    const handleModalDelete = (record: DataSource) => {
-        setSelectedRecord(record)
-        setConfirmSessio(true)
-    }
-
-    //handle delete session pada database
-    const handleDeleteSessio = async (record: DataSource) => {
-        try {
-            const token = localStorage.getItem(record.name)
-            console.log(record.name)
-            // const sessioToken = sessionStorage.getItem()
-            const send = await fetch(
-                'http://192.168.18.45:5000/api/v1/auth/logout',
-                {
-                    method: 'DELETE',
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'X-License-Key':
-                            'akrmxgkgfkjarhfakzmgakjherfgkaueygzamkhj',
-                    },
-                }
-            )
-            setConfirmSessio(false)
-            openNotificationWithIcon(
-                'success',
-                'delete session success',
-                'berhasil menghapus session'
-            )
-            setTimeout(() => {
-                localStorage.removeItem(record.name)
-                router.reload()
-            }, 2000)
-        } catch (err) {
-            console.log(err)
-        }
-    }
-
-    const handleModalCancel = () => {
-        setModalVisible(false)
-    }
-
-    //fitur search
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setSearchTerm(e.target.value)
+        setSearchTerm(e.target.value.toLowerCase())
     }
 
-    const filterDataSearch = dataSource.filter((item) =>
-        item.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredUsers = users.filter((user) =>
+        user.name.toLowerCase().includes(searchTerm)
     )
 
     const columns = [
@@ -297,61 +112,139 @@ function ViewPage() {
         },
         {
             title: 'Actions',
-            dataIndex: 'action',
             key: 'action',
-            width: '90px',
-            render: (_: any, record: DataSource, i: number) => {
-                const userStatus = loggedInUsers[i]?.name
-                return (
-                    <div className="relative">
-                        {/* Tampilkan "default" jika akun adalah akun default */}
-                        {record.name === defaultAccount && (
-                            <Button className="absolute -left-20">
-                                default
-                            </Button>
-                        )}
-                        {userStatus === 'expired' || userStatus === null ? (
-                            <Button onClick={() => handleLogin(record)}>
-                                {userStatus === 'expired' ? 'Relogin' : 'Login'}
-                            </Button>
-                        ) : (
-                            <Button onClick={() => handleLogout(record.name)}>
-                                Logout
-                            </Button>
-                        )}
-                    </div>
-                )
-            },
+            width: '200px',
+            render: (record: User) => (
+                <div className="flex items-center gap-2">
+                    {record.status === 'login' && (
+                        <Button
+                            type={
+                                currentUser === record.name
+                                    ? 'primary'
+                                    : 'default'
+                            }
+                            onClick={() => handleSetDefault(record.name)}
+                            className={
+                                currentUser === record.name
+                                    ? 'bg-green-500 hover:bg-green-600'
+                                    : ''
+                            }
+                        >
+                            {currentUser === record.name
+                                ? 'Default'
+                                : 'Set Default'}
+                        </Button>
+                    )}
+                    <Button
+                        onClick={() =>
+                            record.status !== 'login'
+                                ? handleLoginClick(record)
+                                : handleLogoutClick(record.id)
+                        }
+                        loading={authLoading}
+                        type={record.status === 'login' ? 'primary' : 'default'}
+                        danger={record.status === 'login'}
+                    >
+                        {record.status !== 'login'
+                            ? record.status !== 'expired'
+                                ? 'Login'
+                                : 'Relogin'
+                            : 'Logout'}
+                    </Button>
+                </div>
+            ),
         },
     ]
 
+    const handleModalClose = () => {
+        setIsLoginModalVisible(false)
+        setSelectedUser(null)
+    }
+
+    const handleLoginClick = (user: User) => {
+        setSelectedUser(user)
+        setIsLoginModalVisible(true)
+    }
+
+    const handleLogoutClick = async (userId: number) => {
+        try {
+            const success = await logout(userId)
+            if (success) {
+                openNotificationWithIcon(
+                    'success',
+                    'Logout Successful',
+                    'User has been successfully logged out'
+                )
+                await fetchUsers()
+            } else {
+                openNotificationWithIcon(
+                    'error',
+                    'Logout Failed',
+                    'Failed to logout user. Please try again.'
+                )
+            }
+        } catch (error) {
+            openNotificationWithIcon(
+                'error',
+                'Error',
+                'An unexpected error occurred during logout'
+            )
+        }
+    }
+
+    const handleLoginSubmit = async (values: any) => {
+        try {
+            const result = await login(
+                selectedUser!.name,
+                values.username,
+                values.password
+            )
+            if (result) {
+                openNotificationWithIcon(
+                    'success',
+                    'Login Successful',
+                    `Successfully logged in as ${values.username}`
+                )
+                setIsLoginModalVisible(false)
+                await fetchUsers()
+            } else {
+                openNotificationWithIcon(
+                    'error',
+                    'Login Failed',
+                    'Invalid credentials or Instagram API error'
+                )
+            }
+        } catch (error) {
+            openNotificationWithIcon(
+                'error',
+                'Error',
+                'An unexpected error occurred during login'
+            )
+        }
+    }
+
     return (
         <div className="relative">
-            {isNotified && (
-                <NotificationRepost linkHref="/admin/tables/repost" />
-            )}
-            {contextHolder} {/* Render notification context holder */}
+            {isNotified && <Notification linkHref="/admin/tables/repost" />}
+            {contextHolder}
             <PageHeaders
-                className="flex items-center justify-between px-[30px] py-[25px] bg-transparent"
+                className="flex items-center justify-between px-8 py-6 bg-transparent"
                 ghost
                 title="Kelola Account Ig"
                 subTitle={
                     <div className="flex items-center justify-between w-full">
-                        <div>
-                            <Link
-                                className="bg-primary hover:bg-hbr-primary border-solid border-1 border-primary text-white dark:text-white87 text-[14px] font-semibold leading-[22px] inline-flex items-center justify-center rounded-[4px] px-[20px] h-[44px] shadow-btn gap-[8px]"
-                                href="/admin/crud/axios/login"
-                            >
-                                <UilPlus className="w-[15px] h-[15px]" />{' '}
-                                <span>Add New</span>
-                            </Link>
-                        </div>
-                        <div key={1} className="relative flex-grow ml-4">
-                            <span className="absolute left-[18px] top-[50%] translate-y-[-50%]">
-                                <UilSearch className="w-[16px] h-[16px] text-light dark:text-white60" />
-                            </span>
+                        <Link
+                            className="bg-primary hover:bg-hbr-primary border-solid border-primary text-white text-sm font-semibold leading-normal inline-flex items-center justify-center rounded px-5 h-11"
+                            href="/admin/crud/axios/login"
+                        >
+                            <UilPlus className="w-4 h-4 mr-2" />
+                            Add New
+                        </Link>
+
+                        <div className="relative flex-grow ml-4">
+                            <UilSearch className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-light" />
                             <input
-                                className="border-none h-[40px] min-w-[280px] ltr:pl-[45px] ltr:pr-[20px] rtl:pr-[45px] rtl:pl-[20px] rounded-6 bg-white dark:bg-whiteDark focus-none outline-none"
+                                className="border-none h-10 min-w-[280px] pl-12 pr-5 rounded-lg bg-white focus:outline-none"
                                 type="text"
                                 placeholder="Search by Username"
                                 onChange={handleSearchChange}
@@ -360,60 +253,48 @@ function ViewPage() {
                     </div>
                 }
             />
-            <div className="min-h-[715px] lg:min-h-[580px] flex-1 h-auto px-8 xl:px-[15px] pb-[30px] bg-transparent">
-                <Row gutter={15}>
-                    <Col className="w-100" md={24}>
-                        <div className="bg-white dark:bg-whiteDark rounded-[10px]">
-                            {isLoading ? (
-                                <Spin tip="Loading..." />
-                            ) : (
-                                <Suspense
-                                    fallback={
-                                        <p>Wait now, time to render...</p>
-                                    }
-                                >
-                                    <Table
-                                        columns={columns}
-                                        dataSource={filterDataSearch}
-                                        pagination={{ pageSize: 10 }}
-                                        className="custom-table"
-                                        rowKey="id"
-                                    />
-                                </Suspense>
-                            )}
-                            {loginFailed && (
-                                <p className="text-red-600">
-                                    Invalid username or password. Please try
-                                    again.
-                                </p>
-                            )}
+
+            <div className="min-h-[715px] px-8 pb-8 bg-transparent">
+                <div className="bg-white rounded-lg">
+                    {isLoading ? (
+                        <div className="flex justify-center items-center h-64">
+                            <Spin size="large" />
                         </div>
-                    </Col>
-                </Row>
+                    ) : (
+                        <Table
+                            columns={columns}
+                            dataSource={filteredUsers}
+                            pagination={{ pageSize: 10 }}
+                            rowKey="id"
+                        />
+                    )}
+                </div>
             </div>
-            {/* Modal */}
+
             <Modal
-                visible={modalVisible}
-                onCancel={handleModalCancel}
+                open={isLoginModalVisible}
+                onCancel={handleModalClose}
                 footer={null}
                 className="p-10"
-                key={selectedRecord ? selectedRecord.id : 'modal'}
             >
-                {selectedRecord && (
+                {selectedUser && (
                     <Form
                         className="p-10"
-                        onFinish={handlePassword}
+                        onFinish={handleLoginSubmit}
                         layout="vertical"
                     >
-                        <div className="mb-5 text-sm font-semibold">
-                            <h1>Login Account</h1>
-                        </div>
-                        <Form.Item name="username" label="Username">
-                            <Input
-                                disabled
-                                defaultValue={selectedRecord.username}
-                            />
+                        <h2 className="mb-5 text-lg font-semibold">
+                            Login Account
+                        </h2>
+
+                        <Form.Item
+                            name="username"
+                            label="Username"
+                            initialValue={selectedUser.username}
+                        >
+                            <Input disabled />
                         </Form.Item>
+
                         <Form.Item
                             name="password"
                             label="Password"
@@ -426,11 +307,12 @@ function ViewPage() {
                         >
                             <Input.Password placeholder="Enter password" />
                         </Form.Item>
+
                         <Form.Item>
                             <Button
                                 type="primary"
                                 htmlType="submit"
-                                loading={formLoading}
+                                loading={authLoading}
                                 className="w-full py-5"
                             >
                                 Login
@@ -438,34 +320,6 @@ function ViewPage() {
                         </Form.Item>
                     </Form>
                 )}
-            </Modal>
-            {/* Modal delete session */}
-            <Modal
-                visible={confirmSessio}
-                onCancel={() => setConfirmSessio(false)}
-                className="p-6"
-                footer={null}
-            >
-                <div className="flex flex-col gap-3 py-5 px-3 text-center">
-                    <img
-                        src="https://img.freepik.com/free-vector/cookie-kawaii-food-cartoon_24877-82595.jpg?t=st=1727333075~exp=1727336675~hmac=e9ae4458e43744d2c6362e89e49ffcf3755069334fd374339a6fdec8a6a105fc&w=826"
-                        alt="image 1"
-                        className="mb-4 w-full"
-                    />
-                    <h2>apakah anda yaking ingin menghapus account</h2>
-                    <span className="text-lg">{selectedRecord?.username}</span>
-                    <Button
-                        className="w-full bg-blue-400 shadow-md text-black py-6"
-                        onClick={() => {
-                            if (selectedRecord) {
-                                handleDeleteSessio(selectedRecord)
-                            }
-                            setConfirmSessio(false)
-                        }}
-                    >
-                        Submit
-                    </Button>
-                </div>
             </Modal>
         </div>
     )

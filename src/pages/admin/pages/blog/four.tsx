@@ -1,3 +1,5 @@
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { useRouter } from 'next/router'
 import {
     Checkbox,
     Button,
@@ -10,32 +12,74 @@ import {
     Select,
     Input,
 } from 'antd'
-import { useEffect, useState, useRef, useMemo } from 'react'
-import { useRouter } from 'next/router'
 import Image from 'next/image'
 import { UilFile, UilHeart, UilRepeat } from '@iconscout/react-unicons'
 import { PageHeaders } from '@/components/page-headers'
 import { useNotification } from '../../crud/axios/handler/error'
 import axios from 'axios'
+import { useInstagram } from '@/hooks/useInstagram'
+import { useCache } from '@/hooks/useCache'
 
 const { Option } = Select
 
 interface MediaItem {
-    mediaType: string // photo | video
+    mediaType: string
     url: string
 }
 
 interface Feed {
     id: string
     mediaItems: MediaItem[]
-    mediaType: number // 1 = photo | 2 = video | 8 = carousel
+    mediaType: number
     caption: string
     likeCount: number
     commentCount: number
     takenAt: Date
 }
 
+const MEDIA_TYPES = {
+    photo: 1,
+    video: 2,
+    carousel: 8,
+}
+
+const MediaRenderer = ({
+    media,
+    className,
+}: {
+    media: any
+    className: string
+}) => {
+    if (media.mediaType === 'photo') {
+        return (
+            <Image
+                src={media.url}
+                alt={media.mediaType}
+                width={450}
+                height={550}
+                className={className}
+                // onError={() => setError(true)}
+            />
+        )
+    } else {
+        return (
+            <video
+                controls
+                className={className}
+                // onError={() => setError(true)}
+            >
+                <source src={media.url} type="video/mp4" />
+            </video>
+        )
+    }
+}
+
 function BlogFour() {
+    const { getCacheItem, setCacheItem } = useCache({
+        prefix: 'feeds_',
+        ttl: 60 * 60 * 1000,
+    })
+
     const router = useRouter()
     const [feeds, setFeeds] = useState<Feed[]>([])
     const [selectedMedia, setSelectedMedia] = useState<Set<string>>(new Set())
@@ -48,7 +92,7 @@ function BlogFour() {
     const [nameArsip, setNameArsip] = useState('')
     const [modalVisibleArsip, setModalVisibleArsip] = useState(false)
     const [inputCount, setInputCount] = useState(0)
-    const { openNotificationWithIcon } = useNotification()
+    const { openNotificationWithIcon, contextHolder } = useNotification()
     const abortController = useRef<AbortController | null>(null)
     const [sortCriteria, setSortCriteria] = useState<
         'likes' | 'comments' | 'recent' | 'oldest' | 'trending'
@@ -58,253 +102,14 @@ function BlogFour() {
     >('all')
     const [isLoadingMore, setIsLoadingMore] = useState(false)
     const scrollRef = useRef<HTMLDivElement | null>(null)
-
     const path = '/admin'
 
-    useEffect(() => {
-        if (router.query.pk) {
-            accountFeeds()
-        }
-    }, [])
-
-    const handleLoadMore = async () => {
-        if (isLoadingMore) return
-        setIsLoadingMore(true)
-        try {
-            const token = localStorage.getItem('defaultAccount')
-            if (!token) {
-                openNotificationWithIcon(
-                    'error',
-                    'Token tidak ditemukan',
-                    'Token tidak ditemukan, harap login kembali.'
-                )
-                throw new Error('Token tidak ditemukan, harap login kembali.')
-            }
-            const getToken = localStorage.getItem(token)
-
-            const response = await axios.get(
-                `http://192.168.18.45:5000/api/v1/feeds/${router.query.pk}?next_max_id=${nextMaxPage}`,
-                { headers: { Authorization: `Bearer ${getToken}` } }
-            )
-            if (Array.isArray(response.data.data)) {
-                setFeeds((prevFeeds) => [...prevFeeds, ...response.data.data])
-                setNextMaxPage(response.data.next_max_id)
-            } else {
-                openNotificationWithIcon(
-                    'error',
-                    'Failed to load',
-                    `${response.data.message}`
-                )
-            }
-        } catch (err: any) {
-            openNotificationWithIcon(
-                'error',
-                'Failed to load',
-                `${err.message}`
-            )
-        }
-        setIsLoadingMore(false)
-    }
-
-    const accountFeeds = async () => {
-        if (loading) return
-        setLoading(true)
-        const cachedData = sessionStorage.getItem(`${router.query.pk}-feeds`)
-        if (cachedData) {
-            setFeeds(JSON.parse(cachedData))
-            setLoading(false)
-            return 0
-        }
-        try {
-            const currentUser = localStorage.getItem(localStorage.key(0)!)
-            if (!currentUser) {
-                openNotificationWithIcon(
-                    'error',
-                    'Token tidak ditemukan',
-                    'Token tidak ditemukan, harap login kembali.'
-                )
-                throw new Error('Token tidak ditemukan, harap login kembali.')
-            }
-            const token = localStorage.getItem(currentUser)
-
-            const response = await axios.get(
-                `http://192.168.18.45:5000/api/v1/feeds/hastag/${router.query.name}?next_max_id=${nextMaxPage}`,
-                { headers: { Authorization: `Bearer ${token}` } }
-            )
-            if (Array.isArray(response.data.data)) {
-                setFeeds(response.data.data)
-                setNextMaxPage(response.data.next_max_id)
-                sessionStorage.setItem(
-                    `${router.query.pk}-feeds`,
-                    JSON.stringify(response.data.data)
-                )
-            } else {
-                openNotificationWithIcon(
-                    'error',
-                    'Failed to load',
-                    `${response.data.message}`
-                )
-            }
-        } catch (err: any) {
-            openNotificationWithIcon(
-                'error',
-                'Failed to load',
-                `${err.message}`
-            )
-        }
-        setLoading(false)
-    }
-
-    const handleModalCancel = () => {
-        setModalVisible(false)
-        abortController.current?.abort()
-        setDownloadProgress(0)
-    }
-
-    const toggleSelectMedia = (mediaKey: string) => {
-        setSelectedMedia((prevSelected) => {
-            const newSelected = new Set(prevSelected)
-            newSelected.has(mediaKey)
-                ? newSelected.delete(mediaKey)
-                : newSelected.add(mediaKey)
-            return newSelected
-        })
-    }
-
-    const toggleSelectAll = () => {
-        setAllSelected(!allSelected)
-        if (!allSelected) {
-            const allMediaKeys = new Set(
-                feeds.flatMap((feed) =>
-                    feed.mediaItems.map((media) => `${feed.id}-${media.url}`)
-                )
-            )
-            setSelectedMedia(allMediaKeys)
-        } else {
-            setSelectedMedia(new Set())
-        }
-    }
-
-    const downloadAllMedia = async () => {
-        // Show the modal to input the archive name
-        setModalVisible(true) // Ensure this triggers the modal to show
-        setDownloadProgress(0)
-
-        const selectedFeeds = feeds.map((feed) => ({
-            ...feed,
-            mediaItems: feed.mediaItems.filter((media) =>
-                selectedMedia.has(`${feed.id}-${media.url}`)
-            ),
-        }))
-
-        console.log(selectedFeeds)
-
-        const total = selectedFeeds.reduce(
-            (acc, feed) => acc + feed.mediaItems.length,
-            0
-        )
-        setTotalFiles(total)
-        let downloadedFiles = 0
-
-        abortController.current = new AbortController()
-        const signal = abortController.current.signal
-
-        try {
-            for (const feed of selectedFeeds) {
-                if (feed.mediaItems.length === 0) continue
-                await (window as any).electron.startDownload(
-                    nameArsip, // name of the archive you enter in the input field
-                    feed,
-                    signal
-                )
-                downloadedFiles += feed.mediaItems.length
-                setDownloadProgress(Math.round((downloadedFiles / total) * 100))
-                if (signal.aborted) break
-            }
-        } catch (err: any) {
-            const message = signal.aborted
-                ? 'Proses download telah dibatalkan'
-                : `${err.message}`
-            openNotificationWithIcon('error', 'Download failed', message)
-        } finally {
-            abortController.current?.abort()
-            setNameArsip('')
-        }
-
-        setModalVisible(false) // Hide the download progress modal
-        setDownloadProgress(0)
-    }
-
-    const handlerRepost = async (feed: Feed) => {
-        try {
-            const sendThis = {
-                url: feed.mediaItems.map((media) => media.url),
-                caption: feed.caption,
-            }
-
-            const response = await axios.post(
-                '/hexadash-nextjs/api/repostLoad',
-                sendThis
-            )
-            if (!response) {
-                openNotificationWithIcon(
-                    'error',
-                    'Repost failed',
-                    'Failed to send data to repost endpoint'
-                )
-                return
-            }
-            openNotificationWithIcon(
-                'success',
-                'Repost success',
-                'success send api'
-            )
-            await router.push(`${path}/tables/repost`)
-        } catch (err: any) {
-            console.log(err)
-            openNotificationWithIcon('error', 'Repost failed', err)
-        }
-    }
-
-    const handleInputCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const count = parseInt(e.target.value)
-        if (!isNaN(count)) {
-            setInputCount(count)
-        }
-    }
-
-    const handleSelectMediaBasedOnInput = () => {
-        if (inputCount > 0) {
-            setAllSelected(!allSelected)
-            if (!allSelected) {
-                const selectedFeeds = sortedFeeds.slice(0, inputCount) // Get the top `inputCount` sortedFeeds
-                const selectedMediaSet = new Set(
-                    selectedFeeds.flatMap((feed) =>
-                        feed.mediaItems.map(
-                            (media) => `${feed.id}-${media.url}`
-                        )
-                    )
-                )
-                setSelectedMedia(selectedMediaSet)
-            } else {
-                setSelectedMedia(new Set())
-            }
-        } else {
-            toggleSelectAll()
-        }
-    }
+    const { getFeedsByUsername, isLoading, error } = useInstagram()
 
     const filteredFeeds = useMemo(() => {
         return feeds.filter((feed) => {
             if (mediaFilter === 'all') return true
-            return (
-                feed.mediaType ===
-                {
-                    photo: 1,
-                    video: 2,
-                    carousel: 8,
-                }[mediaFilter]
-            )
+            return feed.mediaType === MEDIA_TYPES[mediaFilter]
         })
     }, [feeds, mediaFilter])
 
@@ -337,19 +142,284 @@ function BlogFour() {
         })
     }, [filteredFeeds, sortCriteria])
 
+    useEffect(() => {
+        if (router.query.pk) {
+            fetchFeeds()
+        }
+    }, [router.query.pk]) // Tambahkan dependency
+
+    const fetchFeeds = async () => {
+        const cacheKey = `feeds_${router.query.pk}`;
+        try {
+            setLoading(true);
+            setIsLoadingMore(true);
+    
+            if (!router.query.pk) {
+                setLoading(true);
+                return;
+            }
+    
+            const defaultAccount = localStorage.getItem('default');
+            if (!defaultAccount) {
+                openNotificationWithIcon(
+                    'error',
+                    'User tidak ditemukan',
+                    'User tidak ditemukan, harap login kembali.'
+                );
+                return;
+            }
+    
+            if (feeds.length === 0) {
+                const cachedData = getCacheItem<{
+                    feeds: Feed[];
+                    nextMaxPage: string;
+                }>(cacheKey);
+    
+                if (cachedData) {
+                    setFeeds([...cachedData.feeds]);
+                    setNextMaxPage(cachedData.nextMaxPage);
+                    setLoading(false);
+                    return;
+                }
+            }
+    
+            const response = await getFeedsByUsername(
+                router.query.pk as string,
+                defaultAccount,
+                nextMaxPage ?? undefined
+            );
+    
+            if (!response.success) {
+                throw new Error(response.message || 'Error get feeds');
+            }
+    
+            if (!response.feeds?.length) {
+                openNotificationWithIcon(
+                    'error',
+                    'No more feeds',
+                    'All feeds have been loaded'
+                );
+                return;
+            }
+    
+            setFeeds((prevFeeds) => {
+                const existingFeedIds = new Set(prevFeeds.map((feed) => feed.id));
+                const newFeeds = response.feeds.filter(
+                    (feed: Feed) => !existingFeedIds.has(feed.id)
+                );
+                const updatedFeeds = [...prevFeeds, ...newFeeds];
+                setCacheItem(cacheKey, {
+                    feeds: updatedFeeds,
+                    nextMaxPage: response.nextMaxId,
+                });
+                return updatedFeeds;
+            });
+    
+            setNextMaxPage(response.nextMaxId);
+        } catch (err: any) {
+            console.error('Failed to load feeds:', err);
+            openNotificationWithIcon('error', 'Failed to load', err.message);
+        } finally {
+            setLoading(false);
+            setIsLoadingMore(false);
+        }
+    };
+
+    const handleModalCancel = () => {
+        setModalVisible(false)
+        abortController.current?.abort()
+        setDownloadProgress(0)
+    }
+
+    const toggleSelectMedia = (feed: Feed) => {
+        const mediaKeys = feed.mediaItems.map(
+            (media) => `${feed.id}-${media.url}`
+        )
+
+        setSelectedMedia((prevSelected) => {
+            const newSelected = new Set(prevSelected)
+            const allSelected = mediaKeys.every((key) => prevSelected.has(key))
+
+            if (allSelected) {
+                mediaKeys.forEach((key) => newSelected.delete(key))
+            } else {
+                mediaKeys.forEach((key) => newSelected.add(key))
+            }
+
+            return newSelected
+        })
+    }
+
+    const toggleSelectAll = () => {
+        setAllSelected(!allSelected)
+        if (!allSelected) {
+            const allMediaKeys = new Set(
+                feeds.flatMap((feed) =>
+                    feed.mediaItems.map((media) => `${feed.id}-${media.url}`)
+                )
+            )
+            setSelectedMedia(allMediaKeys)
+        } else {
+            setSelectedMedia(new Set())
+        }
+    }
+
+    const downloadAllMedia = async () => {
+        setModalVisible(true)
+        setDownloadProgress(0)
+        let downloadedFiles = 0
+        let failedFiles = 0
+
+        const selectedFeeds = feeds
+            .map((feed) => ({
+                ...feed,
+                mediaItems: feed.mediaItems.filter((media) =>
+                    selectedMedia.has(`${feed.id}-${media.url}`)
+                ),
+            }))
+            .filter((feed) => feed.mediaItems.length > 0)
+
+        const total = selectedFeeds.reduce(
+            (acc, feed) => acc + feed.mediaItems.length,
+            0
+        )
+
+        if (total === 0) {
+            openNotificationWithIcon(
+                'error',
+                'No files selected',
+                'Please select files to download'
+            )
+            setModalVisible(false)
+            return
+        }
+
+        setTotalFiles(total)
+        abortController.current = new AbortController()
+        const signal = abortController.current.signal
+
+        try {
+            for (const feed of selectedFeeds) {
+                if (signal.aborted) break
+
+                try {
+                    await (window as any).electron.startDownload(
+                        nameArsip,
+                        feed,
+                        signal
+                    )
+                    downloadedFiles += feed.mediaItems.length
+                } catch (err) {
+                    failedFiles += feed.mediaItems.length
+                    console.error(`Failed to download feed ${feed.id}:`, err)
+                }
+
+                setDownloadProgress(Math.round((downloadedFiles / total) * 100))
+            }
+
+            if (failedFiles > 0) {
+                openNotificationWithIcon(
+                    'error',
+                    'Download completed with errors',
+                    `${failedFiles} files failed to download`
+                )
+            }
+        } catch (err: any) {
+            const message = signal.aborted
+                ? 'Download cancelled'
+                : `${err.message}`
+            openNotificationWithIcon('error', 'Download failed', message)
+        } finally {
+            abortController.current = null
+            setNameArsip('')
+            setModalVisible(false)
+            setDownloadProgress(0)
+        }
+    }
+
+    const handlerRepost = async (feed: Feed) => {
+        try {
+            const sendThis = {
+                url: feed.mediaItems.map((media) => media.url),
+                caption: feed.caption,
+            }
+
+            const response = await axios.post(
+                '/hexadash-nextjs/api/repostLoad',
+                sendThis
+            )
+            if (!response) {
+                openNotificationWithIcon(
+                    'error',
+                    'Repost failed',
+                    'Failed to send data to repost endpoint'
+                )
+                return
+            }
+            openNotificationWithIcon(
+                'success',
+                'Repost success',
+                'success send api'
+            )
+            await router.push(`${path}/tables/repost`)
+        } catch (err: any) {
+            console.error('Repost failed:', err)
+            openNotificationWithIcon('error', 'Repost failed', `${err.message}`)
+        }
+    }
+
+    const handleInputCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const count = parseInt(e.target.value)
+        if (!isNaN(count)) {
+            setInputCount(count)
+        }
+    }
+
+    const handleSelectMediaBasedOnInput = () => {
+        const newAllSelected = !allSelected
+        setAllSelected(newAllSelected)
+
+        if (newAllSelected) {
+            const count = Math.max(
+                0,
+                Math.min(inputCount || sortedFeeds.length, sortedFeeds.length)
+            )
+            const selectedFeeds = sortedFeeds.slice(0, count)
+            const selectedMediaSet = new Set(
+                selectedFeeds.flatMap((feed) =>
+                    feed.mediaItems.map((media) => `${feed.id}-${media.url}`)
+                )
+            )
+            setSelectedMedia(selectedMediaSet)
+        } else {
+            setSelectedMedia(new Set())
+        }
+    }
+
+    useEffect(() => {
+        return () => {
+            // Cleanup
+            abortController.current?.abort()
+            setFeeds([])
+            setSelectedMedia(new Set())
+            setNextMaxPage(null)
+        }
+    }, [])
+
     return (
         <div ref={scrollRef}>
+            {contextHolder}
             <PageHeaders
                 routes={[
                     { path: 'index', breadcrumbName: 'Dashboard' },
-                    { path: '', breadcrumbName: `Account` },
+                    { path: '', breadcrumbName: 'Account' },
                 ]}
                 title="Account"
-                className="flex justify-between items-center px-8 xl:px-[15px] pt-[18px] pb-6 sm:pb-[30px] bg-transparent sm:flex-col"
+                className="flex justify-between items-center px-8 xl:px-4 pt-4 pb-6 sm:pb-8 bg-transparent sm:flex-col"
             />
 
             <Spin spinning={loading} tip="Loading Feeds...">
-                <main className="min-h-[715px] lg:min-h-[580px] bg-transparent px-[30px] xl:px-[15px] pb-[25px]">
+                <main className="min-h-[715px] lg:min-h-[580px] bg-transparent px-8 xl:px-4 pb-6">
                     <div className="flex items-center justify-between mb-6 bg-white/90 p-4 rounded-lg shadow">
                         <div className="flex items-center">
                             <Checkbox
@@ -358,7 +428,7 @@ function BlogFour() {
                                 className="font-medium"
                             >
                                 <span className="w-max block">
-                                    Select All /{' '}
+                                    Select All / {inputCount}
                                 </span>
                             </Checkbox>
 
@@ -367,7 +437,7 @@ function BlogFour() {
                                 value={inputCount}
                                 onChange={handleInputCountChange}
                                 maxLength={3}
-                                className="py-1.5 px-3 rounded-lg border-primary w-24"
+                                className="py-1.5 px-3 rounded-lg border-primary w-24 ml-2"
                             />
                         </div>
                         <div className="space-x-4">
@@ -399,14 +469,15 @@ function BlogFour() {
                     </div>
 
                     <Row gutter={[14, 18]}>
-                        {sortedFeeds.map((feed) => (
-                            <Col sm={6} xs={8} span={8} key={feed.id}>
+                        {sortedFeeds.map((feed, index) => (
+                            <Col
+                                sm={6}
+                                xs={8}
+                                span={8}
+                                key={`${feed.id}-${index}`}
+                            >
                                 <div
-                                    onClick={() =>
-                                        toggleSelectMedia(
-                                            `${feed.id}-${feed.mediaItems[0].url}`
-                                        )
-                                    }
+                                    onClick={() => toggleSelectMedia(feed)}
                                     className="bg-white rounded-lg shadow-lg p-3 mb-6 transition-all hover:shadow-xl"
                                 >
                                     {feed.mediaType === 8 ? (
@@ -420,35 +491,14 @@ function BlogFour() {
                                                             )}
                                                             onChange={(e) => {
                                                                 e.stopPropagation()
-                                                                toggleSelectMedia(
-                                                                    `${feed.id}-${media.url}`
-                                                                )
+                                                                toggleSelectAll()
                                                             }}
                                                         />
-                                                        {media.mediaType ===
-                                                        'photo' ? (
-                                                            <Image
-                                                                src={media.url}
-                                                                alt={
-                                                                    media.mediaType
-                                                                }
-                                                                width={450}
-                                                                height={550}
-                                                                className="rounded w-full"
-                                                            />
-                                                        ) : (
-                                                            <video
-                                                                controls
-                                                                className="rounded w-full"
-                                                            >
-                                                                <source
-                                                                    src={
-                                                                        media.url
-                                                                    }
-                                                                    type="video/mp4"
-                                                                />
-                                                            </video>
-                                                        )}
+                                                        {MediaRenderer({
+                                                            media,
+                                                            className:
+                                                                'rounded-md',
+                                                        })}
                                                     </div>
                                                 )
                                             )}
@@ -461,9 +511,7 @@ function BlogFour() {
                                                 )}
                                                 onChange={(e) => {
                                                     e.stopPropagation()
-                                                    toggleSelectMedia(
-                                                        `${feed.id}-${feed.mediaItems[0].url}`
-                                                    )
+                                                    toggleSelectMedia(feed)
                                                 }}
                                             />
                                             <Image
@@ -484,9 +532,7 @@ function BlogFour() {
                                                 )}
                                                 onChange={(e) => {
                                                     e.stopPropagation()
-                                                    toggleSelectMedia(
-                                                        `${feed.id}-${feed.mediaItems[0].url}`
-                                                    )
+                                                    toggleSelectMedia(feed)
                                                 }}
                                             />
                                             <video
@@ -530,7 +576,6 @@ function BlogFour() {
                     </Row>
                 </main>
             </Spin>
-
             <div
                 className={`fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 ${
                     modalVisibleArsip ? 'block' : 'hidden'
@@ -539,11 +584,7 @@ function BlogFour() {
                 aria-labelledby="arsip-modal-title"
                 aria-describedby="arsip-modal-description"
             >
-                <div
-                    className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md mx-4"
-                    style={{ position: 'relative' }}
-                >
-                    {/* Title */}
+                <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md mx-4">
                     <h2
                         id="arsip-modal-title"
                         className="text-lg font-semibold mb-4 text-center"
@@ -551,7 +592,6 @@ function BlogFour() {
                         Tambah Arsip Baru
                     </h2>
 
-                    {/* Description */}
                     <p
                         id="arsip-modal-description"
                         className="text-gray-600 text-sm text-center mb-4"
@@ -559,7 +599,6 @@ function BlogFour() {
                         Masukkan nama arsip baru yang ingin ditambahkan
                     </p>
 
-                    {/* Input Field */}
                     <input
                         type="text"
                         placeholder="Nama Arsip"
@@ -568,7 +607,6 @@ function BlogFour() {
                         className="w-full h-10 px-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
 
-                    {/* Buttons */}
                     <div className="flex justify-end gap-2">
                         <button
                             onClick={() => setModalVisibleArsip(false)}
@@ -578,8 +616,8 @@ function BlogFour() {
                         </button>
                         <button
                             onClick={() => {
-                                setModalVisibleArsip(false) // Close the modal
-                                downloadAllMedia() // Trigger the download process
+                                setModalVisibleArsip(false)
+                                downloadAllMedia()
                             }}
                             className={`px-4 py-2 text-white rounded-md ${
                                 nameArsip.trim()
@@ -594,15 +632,19 @@ function BlogFour() {
                 </div>
             </div>
 
-            {isLoadingMore && <Spin size="large" className="mt-4" />}
-            {!isLoadingMore && (
-                <Button
-                    onClick={handleLoadMore}
-                    className="load-more-button mt-4"
-                >
-                    Load More
-                </Button>
-            )}
+            <div className="mt-4 flex justify-center">
+                {isLoadingMore ? (
+                    <Spin size="large" />
+                ) : (
+                    <Button
+                        onClick={fetchFeeds}
+                        disabled={!nextMaxPage || loading}
+                        className="load-more-button"
+                    >
+                        {nextMaxPage ? 'Load More' : 'No More Data'}
+                    </Button>
+                )}
+            </div>
 
             <Modal
                 open={modalVisible}

@@ -7,6 +7,9 @@ import axios from 'axios'
 
 const { Item } = Form
 
+const BASE_URL =
+    'http://localhost:3000/hexadash-nextjs/api/instagram-private-api'
+
 interface apiResponse {
     status: number
     msg: string
@@ -30,12 +33,14 @@ function LoginPage() {
             name: values.name,
             username: values.username,
             password: values.password,
+            status: 'logout'
         }
-        console.log(dataLogin)
 
         try {
             const response = await axios.post(
-                'http://192.168.18.45:5000/api/v1/users/create',dataLogin)
+                `${BASE_URL}/users/create`,
+                dataLogin
+            )
             const getMessage = await response.data
             if (!response) {
                 setLoginFailed(true)
@@ -58,6 +63,7 @@ function LoginPage() {
         } catch (err: any) {
             setLoginFailed(true)
             openNotificationWithIcon('error', 'Login failed', err.message)
+            console.error(err)
         } finally {
             setFormLoading(false) // Stop loading
         }

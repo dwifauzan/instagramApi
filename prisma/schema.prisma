@@ -10,6 +10,26 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Instagram Accounts
+model UserInstagram {
+  id       Int               @id @default(autoincrement())
+  name     String            @unique
+  username String
+  password String
+  status   String
+  session  InstagramSession?
+}
+
+model InstagramSession {
+  id        Int           @id @default(autoincrement())
+  session   String
+  cookieJar String
+  userId    Int           @unique
+  user      UserInstagram @relation(fields: [userId], references: [id])
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
 model Arsip {
   id           Int           @id @default(autoincrement())
   nama_arsip   String        @unique
