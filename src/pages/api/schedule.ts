@@ -32,15 +32,14 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
                 time,
                 users,
                 perpostingan,
-                lokasi,
+                location,
             } = req.body
             const uniqueFolderIds = new Set(
                 folderArsip.map(
                     (item: any) => item.detail_content.folderArsipId
                 )
             )
-            const totalFolders = uniqueFolderIds.size
-            console.log(totalFolders)
+            console.log('ini adalah ', req.body)
 
             const browser = await puppeteer.launch({ headless: false })
             const page = await browser.newPage()
@@ -109,6 +108,11 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
                         const text = await option.evaluate((el) =>
                             el.textContent?.trim()
                         )
+                        // Skip jika elemen adalah "Save Preference"
+                        if (text === 'Save preference') {
+                            console.log('Mengabaikan opsi Save Preference')
+                            continue
+                        }
                         if (text && !users.includes(text)) await option.click()
                     }
                     await page.click('[role="combobox"]')
@@ -164,46 +168,26 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
                     }
                     await new Promise((resolve) => setTimeout(resolve, 2000))
 
-                    const locationPath =
-                        '[aria-label="Location"][role="button"]'
-                    const locationWait = await page.$$(locationPath)
-                    let foundLocation = false
-
-                    await locationWait.click()
-
-                    // for (const buttonLocation of locationWait) {
-                    //     const buttonText = await page.evaluate((el) => {
-                    //         if (el instanceof HTMLElement) {
-                    //             return el.textContent
-                    //                 ? el.textContent.trim()
-                    //                 : ''
-                    //         }
-                    //         return ''
-                    //     }, buttonLocation)
-
-                    //     // Pastikan teksnya sesuai dengan apa yang diinginkan
-                    //     if (buttonText === 'Enter a location') {
-                    //         // Tunggu elemen sebelum mengkliknya (jika perlu)
-                    //         await page.waitForSelector(locationPath)
-                    //         await buttonLocation.click() // klik sekali untuk membuka modal
-                    //         console.log('Lokasi button clicked')
-
-                    //         // Tunggu input field dalam modal muncul
-                    //         const inputSelector =
-                    //             '[aria-label="Location input"]' // Gantilah dengan selector yang sesuai
-                    //         await page.waitForSelector(inputSelector)
-
-                    //         // Masukkan lokasi
-                    //         await page.type(inputSelector, lokasi)
-                    //         console.log('Lokasi berhasil dimasukkan')
-                    //         foundLocation = true
-                    //         break
+                    // const locationPath =
+                    //     '[aria-label="Location"][role="button"][aria-disabled="false"]'
+                    // const locationWait = await page.$(locationPath)
+                    // if (locationWait) {
+                    //     await locationWait.click()
+                    //     console.log('location di temukan')
+                    //     //eksekusi ini
+                    //     const inputXpath =
+                    //         '[contains(text(), "Enter a location")]'
+                    //     await new Promise((resolve) =>
+                    //         setTimeout(resolve, 2000)
+                    //     )
+                    //     const typeXpath = await page.$(inputXpath)
+                    //     if (typeXpath) {
+                    //         await typeXpath.click()
+                    //         await typeXpath.type(location)
                     //     }
+                    // } else {
+                    //     console.log('location tidak ditemukan')
                     // }
-
-                    if (!foundLocation) {
-                        console.log('Lokasi tidak ditemukan')
-                    }
 
                     // Klik tombol untuk menjadwalkan
                     // Jadwal dan pengaturan lainnya

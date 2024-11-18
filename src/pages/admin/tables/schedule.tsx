@@ -1,259 +1,258 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react'
 import {
     Form,
-    DatePicker,
-    TimePicker,
     Button,
-    Upload,
     Select,
     Row,
     Col,
     Card,
-    Switch,
     Input,
     Modal,
-    Spin
-} from 'antd';
-import axios from 'axios';
-import { useNotification } from '@/pages/admin/crud/axios/handler/error';
+    Spin,
+    Image,
+} from 'antd'
+import axios from 'axios'
+import { useNotification } from '@/pages/admin/crud/axios/handler/error'
+import { useRouter } from 'next/router'
 
-const { Option } = Select;
+const { Option } = Select
 
 interface LocalData {
-    id: number;
-    name: string;
-    access_token: string;
-    users: string;
-    expired_at: string;
-    isActive: boolean;
+    id: number
+    name: string
+    access_token: string
+    users: string
+    expired_at: string
+    isActive: boolean
 }
-
 const SchedulePage = () => {
-    const [localData, setLocalData] = useState<LocalData[]>([]);
-    const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
-    const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-    const [fileList, setFileList] = useState<any[]>([]);
-    const [txtFileList, setTxtFileList] = useState<any[]>([]);
-    const [formLoading, setFormLoading] = useState(false);
-    const [formOutput, setFormOutput] = useState<any>(null);
-    const [useTextarea, setUseTextarea] = useState(false);
-    const [isModalVisible, setIsModalVisible] = useState(false);
+    const [localData, setLocalData] = useState<LocalData[]>([])
+    const [selectedAccount, setSelectedAccount] = useState<string>('')
+    const [formLoading, setFormLoading] = useState(false)
+    const [isModalVisible, setIsModalVisible] = useState(false)
+    const [mediaFiles, setMediaFiles] = useState<string>('')
+    const [captionText, setCaptionText] = useState<string>('')
 
-    const { openNotificationWithIcon, contextHolder } = useNotification();
-    const [form] = Form.useForm();
-
-    const getLocalData = async () => {
-        try {
-            const response = await fetch(
-                'http://192.168.18.45:5000/api/v1/accounts'
-            );
-            const load = await response.json();
-            const transformLoad = load.data.map((item: any) => ({
-                ...item,
-                id: item.id,
-            }));
-            setLocalData(transformLoad);
-        } catch (err) {
-            console.error(err);
-        }
-    };
+    const { openNotificationWithIcon, contextHolder } = useNotification()
+    const [usersF, setUsersF] = useState<LocalData[]>([]) // facebook accounts
+    const [usersI, setUsersI] = useState<string[]>([]) // instagram accounts
+    const [fSelected, setFSelected] = useState<number>(0)
+    const [form] = Form.useForm()
+    const router = useRouter()
 
     useEffect(() => {
-        getLocalData();
-    }, []);
-
-    const handleFileChange = ({ fileList: newFileList }: any) => {
-        setFileList(newFileList);
-    };
-
-    const handleTxtChange = ({ fileList: newTxtFileList }: any) => {
-        setTxtFileList(newTxtFileList);
-    };
-
-    const handleAccountChange = (selectedAccountId: string) => {
-        setSelectedAccounts([selectedAccountId]);
-        const users: string[] = [];
-        const account = localData.find(
-            (item) => item.id.toString() === selectedAccountId
-        );
-        if (account) {
-            const accountUsers = account.users
-                .split(',')
-                .map((user) => user.trim());
-            users.push(...accountUsers);
+        const getUsers = async () => {
+            try {
+                const response = await axios.get(
+                    'http://192.168.18.45:5000/api/v1/accounts'
+                )
+                setUsersF(response.data.data)
+            } catch (error) {
+                console.error('Error fetching users:', error)
+            }
         }
-        setSelectedUsers(users);
-    };
+        getUsers()
+    }, [])
 
-    const handleSchedule = async (values: any) => {
-        setFormLoading(true);
-        setIsModalVisible(true);
+    const getRepostMedia = async () => {
+        const image = '/hexadash-nextjs/repost/media-0.jpg'
+        const video = '/hexadash-nextjs/repost/media-0.mp4'
 
         try {
-            const selectedAccountData = localData.find((account) =>
-                selectedAccounts.includes(account.id.toString())
-            );
-            if (!selectedAccountData) {
-                openNotificationWithIcon(
-                    'error',
-                    'Undefined Account',
-                    'Akun tidak ditemukan'
-                );
-                return;
+            const response = await axios.get(image, { responseType: 'blob' })
+            if (response.status === 200) {
+                setMediaFiles(image)
+            } else {
+                setMediaFiles(video)
             }
+        } catch (err: any) {
+            console.log('Media not found')
+            setMediaFiles(video)
+        }
+    }
 
-            const accessToken = selectedAccountData.access_token;
+    useEffect(() => {
+        getRepostMedia()
+    }, [])
 
-            const formData = new FormData();
-            formData.append('access_token', accessToken);
-            formData.append('users', JSON.stringify(selectedUsers));
-            formData.append(
-                'schedule_date',
-                values.schedule_date.format('DD/MM/YYYY')
-            );
-            formData.append(
-                'schedule_time',
-                values.schedule_time.format('HH:mm')
-            );
+    const fetchCaptionFromFile = async () => {
+        try {
+            const response = await axios.get(
+                '/hexadash-nextjs/api/readCaptionRepost'
+            )
+            const result = response.data.content
+            setCaptionText(result)
+            form.setFieldsValue({ textareaValue: result })
+        } catch (error) {
+            console.error('Failed to read caption file:', error)
+        }
+    }
 
-            fileList.forEach((file) => {
-                formData.append('media', file.originFileObj);
-            });
+    const handleSelectF = (value: number) => {
+        setFSelected(value)
+        const selectedUser = usersF.find((user) => user.id === value)
+        if (selectedUser) {
+            setUsersI(selectedUser.users.split(','))
+        }
+    }
 
-            if (!useTextarea && txtFileList.length > 0) {
-                txtFileList.forEach((file) => {
-                    formData.append('txtFiles', file.originFileObj);
-                });
-            } else if (useTextarea) {
-                const textareaValue = values.textareaValue || '';
-                const blob = new Blob([textareaValue], { type: 'text/plain' });
-                formData.append('txtFiles', blob, 'custom.txt');
+    const handleRepost = async (values: any) => {
+        setFormLoading(true)
+        setIsModalVisible(true)
+
+        try {
+            const accessToken = usersF.find(
+                (user: any) => user.id === fSelected
+            )?.access_token
+            const data = {
+                access_token: accessToken,
+                users: values.users_instagram, // Akun Instagram yang dipilih
+                caption: captionText,
+                mediaFiles: mediaFiles,
             }
 
             const response = await axios.post(
-                '/hexadash-nextjs/api/schedule',
-                formData,
-                {
-                    headers: {
-                        'Content-Type': 'multipart/form-data',
-                    },
-                }
-            );
+                '/hexadash-nextjs/api/postLangsung',
+                data
+            )
 
-            if (response.status !== 200) {
-                const error = response.data;
+            if (response.status === 201) {
+                const result = response.data
                 openNotificationWithIcon(
-                    'error',
-                    'Failed Schedule',
-                    error.message
-                );
+                    'success',
+                    'Success Repost',
+                    result.message
+                )
+                const path = '/admin'
+                router.push(`${path}/pages/search`)
+
+                form.resetFields()
+                setSelectedAccount('')
             }
-
-            const result = response.data;
-            openNotificationWithIcon(
-                'success',
-                'Success Schedule',
-                result.message
-            );
-
-            // Reset form fields
-            form.resetFields();
-            setFileList([]);
-            setTxtFileList([]);
-            setSelectedAccounts([]);
-            setSelectedUsers([]);
         } catch (err: any) {
-            openNotificationWithIcon('error', 'Failed Schedule', err.message);
+            localStorage.setItem('retry-repost-route', '/admin/tables/schedule')
+            openNotificationWithIcon('error', 'Failed to Repost', err.message)
         } finally {
-            setFormLoading(false);
-            setIsModalVisible(false);
+            setFormLoading(false)
+            setIsModalVisible(false)
         }
-    };
-
-    const validasiTxt = (file: File) => {
-        const isTxt = file.type === 'text/plain';
-        if (!isTxt) {
-            openNotificationWithIcon(
-                'error',
-                'Failed Schedule',
-                'Hanya format txt selain itu tidak dapat diterima!'
-            );
-            return Upload.LIST_IGNORE;
-        }
-        return isTxt;
-    };
+    }
 
     return (
         <div>
             {contextHolder}
             <main className="min-h-[715px] lg:min-h-[580px] bg-transparent px-8 pb-12">
-                <Row gutter={25}>
+                <Row gutter={25} className="mt-6">
                     <Col sm={12} xs={18}>
-                        <Card title="Jadwalkan Postingan" bordered={false} style={{ borderRadius: 8 }}>
-                            <Form onFinish={handleSchedule} layout="vertical">
-                                {/* Select Account */}
-                                <Form.Item label="Pilih Akun" name="accounts" rules={[{ required: true, message: 'Silakan pilih akun!' }]}>
-                                    <Select placeholder="Pilih akun" onChange={handleAccountChange} style={{ width: '100%' }}>
-                                        {localData.map((account) => {
-                                            const usersArray = account.users.split(',');
-                                            return usersArray.map((user: string, index: number) => (
-                                                <Option key={`${account.id}-${index}`} value={account.id.toString()}>
-                                                    {user.trim()}
-                                                </Option>
-                                            ));
-                                        })}
+                        <Card
+                            title="Repost"
+                            bordered={false}
+                            style={{ borderRadius: 8 }}
+                        >
+                            <Form
+                                onFinish={handleRepost}
+                                layout="vertical"
+                                initialValues={{
+                                    textareaValue: captionText,
+                                }}
+                            >
+                                <Form.Item
+                                    name="users_facebook"
+                                    label="Akun Facebook"
+                                    rules={[
+                                        {
+                                            required: true,
+                                            message: 'Pilih akun Facebook!',
+                                        },
+                                    ]}
+                                >
+                                    <Select
+                                        placeholder="Select Users Facebook"
+                                        onChange={handleSelectF}
+                                    >
+                                        {usersF?.map((user: any) => (
+                                            <Select.Option
+                                                value={user.id}
+                                                key={user.id}
+                                            >
+                                                {user.name}
+                                            </Select.Option>
+                                        ))}
                                     </Select>
                                 </Form.Item>
 
-                                {/* Date Picker */}
-                                <Form.Item label="Jadwal Tanggal" name="schedule_date" rules={[{ required: true, message: 'Silakan pilih tanggal!' }]}>
-                                    <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
+                                <Form.Item
+                                    name="users_instagram"
+                                    label="Akun Instagram terkait"
+                                    rules={[
+                                        {
+                                            required: true,
+                                            message: 'Pilih akun Instagram!',
+                                        },
+                                    ]}
+                                >
+                                    <Select
+                                        mode="multiple"
+                                        placeholder="Select Users Instagram"
+                                        options={usersI?.map((user) => ({
+                                            value: user,
+                                            label: user,
+                                        }))}
+                                    />
                                 </Form.Item>
 
-                                {/* Time Picker */}
-                                <Form.Item label="Jadwal Waktu" name="schedule_time" rules={[{ required: true, message: 'Silakan pilih waktu!' }]}>
-                                    <TimePicker format="HH:mm" style={{ width: '100%' }} />
+                                <Input.TextArea
+                                    rows={12}
+                                    placeholder="Masukkan caption di sini..."
+                                    value={captionText}
+                                    onChange={(e) =>
+                                        setCaptionText(e.target.value)
+                                    }
+                                    className="text-base"
+                                />
+
+                                <Button
+                                    type="dashed"
+                                    onClick={fetchCaptionFromFile}
+                                    className="mt-2"
+                                >
+                                    Gunakan Caption
+                                </Button>
+
+                                <Form.Item label="Lokasi" name="location">
+                                    <Input placeholder="Masukkan lokasi..." />
                                 </Form.Item>
 
-                                {/* Upload Image/Video */}
-                                <Form.Item label="Upload Gambar/Video">
-                                    <Upload fileList={fileList} beforeUpload={() => false} onChange={handleFileChange} showUploadList={{ showRemoveIcon: true }}>
-                                        <Button>+ Pilih File</Button>
-                                    </Upload>
-                                </Form.Item>
-
-                                {/* Switch for .txt file or textarea */}
-                                <Form.Item label="Gunakan Textarea?">
-                                    <Switch checked={useTextarea} onChange={setUseTextarea} />
-                                </Form.Item>
-
-                                {/* Conditional input for .txt */}
-                                {useTextarea ? (
-                                    <Form.Item label="Masukkan Text untuk .txt" name="textareaValue" rules={[{ required: true, message: 'Silakan masukkan teks!' }]}>
-                                        <Input.TextArea rows={4} placeholder="Masukkan teks di sini..." />
-                                    </Form.Item>
-                                ) : (
-                                    <Form.Item label="Upload File .txt">
-                                        <Upload fileList={txtFileList} beforeUpload={validasiTxt} onChange={handleTxtChange} showUploadList={{ showRemoveIcon: true }}>
-                                            <Button>+ Pilih File .txt</Button>
-                                        </Upload>
-                                    </Form.Item>
-                                )}
-
-                                {/* Submit Button */}
                                 <Form.Item>
-                                    <Button type="primary" htmlType="submit" loading={formLoading} block>
-                                        Submit Jadwal
+                                    <Button
+                                        type="primary"
+                                        htmlType="submit"
+                                        loading={formLoading}
+                                        block
+                                    >
+                                        Submit Repost
                                     </Button>
                                 </Form.Item>
                             </Form>
-
-                            {formOutput && (
-                                <div style={{ marginTop: '20px', border: '1px solid #ccc', borderRadius: 8, padding: '10px' }}>
-                                    <h3>Output Form:</h3>
-                                    <pre>{JSON.stringify(formOutput, null, 2)}</pre>
-                                </div>
+                        </Card>
+                    </Col>
+                    <Col sm={12} xs={24}>
+                        <Card
+                            title="Pratinjau Media"
+                            className="max-w-[450px] aspect-square rounded-lg shadow-md"
+                        >
+                            {mediaFiles && (
+                                <Image
+                                    className="w-full"
+                                    src={mediaFiles}
+                                    alt="Pratinjau Media"
+                                />
                             )}
+                            <div className="p-2 text-left">
+                                <p className="line-clamp-4 text-base">
+                                    {captionText}
+                                </p>
+                            </div>
                         </Card>
                     </Col>
                 </Row>
@@ -261,14 +260,20 @@ const SchedulePage = () => {
 
             <Modal
                 visible={isModalVisible}
-                footer={null} // Remove footer buttons
-                style={{ borderRadius: 12 }} // Style modal to look like a card
-                bodyStyle={{ borderRadius: 12, padding: '20px', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)' }} // Add shadow and padding
+                footer={null}
+                maskClosable={false}
+                style={{
+                    borderRadius: 12,
+                    padding: '20px',
+                    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+                }}
             >
-                <Spin tip="Menunggu..." spinning={formLoading} />
+                <div style={{ borderRadius: 12, padding: '20px' }}>
+                    <Spin tip="Menunggu..." spinning={formLoading} />
+                </div>
             </Modal>
         </div>
-    );
-};
+    )
+}
 
-export default SchedulePage;
+export default SchedulePage

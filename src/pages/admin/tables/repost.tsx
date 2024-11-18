@@ -1,251 +1,75 @@
-import React, { useEffect, useState } from 'react'
-import {
-    Form,
-    Button,
-    Select,
-    Row,
-    Col,
-    Card,
-    Input,
-    Modal,
-    Spin,
-    Image,
-} from 'antd'
-import axios from 'axios'
-import { useNotification } from '@/pages/admin/crud/axios/handler/error'
+import { Row, Col } from 'antd'
+import { PageHeaders } from '@/components/page-headers'
+import Link from 'next/link'
+import Image from 'next/image'
 
-const { Option } = Select
-
-interface LocalData {
-    id: number
-    name: string
-    username: string
-    password: string
-}
-
-const RepostPage = () => {
-    const [localData, setLocalData] = useState<LocalData[]>([])
-    const [selectedAccount, setSelectedAccount] = useState<string>('')
-    const [formLoading, setFormLoading] = useState(false)
-    const [isModalVisible, setIsModalVisible] = useState(false)
-    const [mediaFiles, setMediaFiles] = useState<string>('')
-    const [captionText, setCaptionText] = useState<string>('')
-
-    const { openNotificationWithIcon, contextHolder } = useNotification()
-    const [form] = Form.useForm()
-
-    const getLocalData = async () => {
-        try {
-            const response = await fetch(
-                'http://192.168.18.45:5000/api/v1/users'
-            )
-            const load = await response.json()
-            const localStorageKeys = Object.keys(localStorage)
-            const filteredData = load.data.filter((user: any) =>
-                localStorageKeys.includes(user.name)
-            )
-            setLocalData(filteredData)
-        } catch (err) {
-            console.error(err)
-        }
-    }
-
-    const getRepostMedia = async () => {
-        const image = '/hexadash-nextjs/repost/media-0.jpg'
-        const video = '/hexadash-nextjs/repost/cover-0.jpg'
-
-        try {
-            const response = await axios.get(image, { responseType: 'blob' })
-            if (response.status == 200) {
-                setMediaFiles(image)
-            } else {
-                setMediaFiles(video)
-            }
-        } catch (err: any) {
-            console.log('tidak ditemukan')
-            setMediaFiles(video)
-        }
-    }
-
-    useEffect(() => {
-        getLocalData()
-        getRepostMedia()
-    }, [])
-
-    // Fungsi untuk membaca file caption.txt
-    const fetchCaptionFromFile = async () => {
-        try {
-            const response = await axios.get(
-                '/hexadash-nextjs/api/readCaptionRepost'
-            )
-            const result = response.data.content
-            setCaptionText(result) // Pastikan ini benar
-            form.setFieldsValue({ textareaValue: result }) // Mengisi textarea
-        } catch (error) {
-            console.error('Gagal membaca file caption.txt:', error)
-        }
-    }
-
-    const handleRepost = async (values: any) => {
-        setFormLoading(true)
-        setIsModalVisible(true)
-
-        try {
-            const data = {
-                id: selectedAccount,
-                caption: captionText,
-            }
-            console.log(data.id)
-
-            const response = await axios.post(
-                '/hexadash-nextjs/api/repost',
-                data
-            )
-
-            if (response.status !== 200) {
-                const error = response.data
-                openNotificationWithIcon(
-                    'error',
-                    'Failed to Repost',
-                    error.message
-                )
-            } else {
-                const result = response.data
-                openNotificationWithIcon(
-                    'success',
-                    'Success Repost',
-                    result.message
-                )
-
-                form.resetFields()
-                setSelectedAccount('')
-            }
-        } catch (err: any) {
-            localStorage.setItem('retry-repost-route', '/admin/tables/repost')
-            openNotificationWithIcon('error', 'Failed to Repost', err.message)
-        } finally {
-            setFormLoading(false)
-            setIsModalVisible(false)
-        }
-    }
-
+function RepostPage() {
+    const path = '/admin'
+    const PageRoutes = [
+        {
+            path: 'index',
+            breadcrumbName: 'Dashboard',
+        },
+        {
+            path: '',
+            breadcrumbName: 'Schedule Menu',
+        },
+    ]
     return (
-        <div>
-            {contextHolder}
+        <>
+            <PageHeaders
+                routes={PageRoutes}
+                title="Schedule Menu"
+                className="flex  justify-between items-center px-8 xl:px-[15px] pt-[18px] pb-6 sm:pb-[30px] bg-transparent sm:flex-col"
+            />
             <main className="min-h-[715px] lg:min-h-[580px] bg-transparent px-8 pb-12">
-                <Row gutter={25} className="mt-6">
+                <Row gutter={25}>
                     <Col sm={12} xs={18}>
-                        <Card
-                            title="Repost"
-                            bordered={false}
-                            style={{ borderRadius: 8 }}
-                        >
-                            <Form
-                                onFinish={handleRepost}
-                                layout="vertical"
-                                initialValues={{
-                                    textareaValue: captionText, // Ini hanya untuk inisialisasi
-                                }}
-                            >
-                                <Form.Item
-                                    label="Pilih Akun"
-                                    name="accounts"
-                                    rules={[
-                                        {
-                                            required: true,
-                                            message: 'Silakan pilih akun!',
-                                        },
-                                    ]}
-                                >
-                                    <Select
-                                        placeholder="Pilih akun"
-                                        onChange={setSelectedAccount}
-                                        style={{ width: '100%' }}
-                                    >
-                                        {localData.map((account) => (
-                                            <Option
-                                                key={account.id}
-                                                value={account.id.toString()}
-                                            >
-                                                {account.username}
-                                            </Option>
-                                        ))}
-                                    </Select>
-                                </Form.Item>
-
-                                <Input.TextArea
-                                    rows={12}
-                                    placeholder="Masukkan caption di sini..."
-                                    value={captionText}
-                                    onChange={(e) =>
-                                        setCaptionText(e.target.value)
-                                    }
-                                    className="text-base"
-                                />
-
-                                <Button
-                                    type="dashed"
-                                    onClick={fetchCaptionFromFile}
-                                    className="mt-2"
-                                >
-                                    Gunakan Caption
-                                </Button>
-
-                                <Form.Item label="Lokasi" name="location">
-                                    <Input placeholder="Masukkan lokasi..." />
-                                </Form.Item>
-
-                                <Form.Item>
-                                    <Button
-                                        type="primary"
-                                        htmlType="submit"
-                                        loading={formLoading}
-                                        block
-                                    >
-                                        Submit Repost
-                                    </Button>
-                                </Form.Item>
-                            </Form>
-                        </Card>
-                    </Col>
-                    {/* Preview Media */}
-                    <Col sm={12} xs={24}>
-                        <Card
-                            title="Pratinjau Media"
-                            className="max-w-[450px] aspect-square rounded-lg shadow-md"
-                        >
-                            {mediaFiles && (
-                                <Image
-                                    className="w-full"
-                                    src={mediaFiles}
-                                    alt="Pratinjau Media"
-                                />
-                            )}
-                            <div className="p-2 text-left">
-                                <p className="line-clamp-4 text-base">
-                                    {captionText}
-                                </p>
+                        <Link href={`${path}/tables/schedule`}>
+                            <div className="bg-white dark:bg-white/10 m-0 p-0 mb-[25px] rounded-10 relative">
+                                <div className="p-[25px]">
+                                    <Image
+                                        src="https://img.freepik.com/free-vector/appointment-booking-mobile-phone-with-calendar_23-2148550000.jpg?t=st=1730102155~exp=1730105755~hmac=6702631bf2696197b5d799acb373b4f0c4b676a7c58bb97a73984cd88b735cff&w=740"
+                                        width={430}
+                                        height={230}
+                                        alt=""
+                                    />
+                                    <h1 className="mb-0 text-lg text-dark dark:text-white/60 capitalize">
+                                        repost langsung
+                                    </h1>
+                                    <span className="capitalize fs-4">
+                                        hanya bisa schedule 1 postingan dan
+                                        pastikan anda sudah menyiapkan postigan
+                                    </span>
+                                </div>
                             </div>
-                        </Card>
+                        </Link>
+                    </Col>
+                    <Col sm={12} xs={18}>
+                        <Link href={`${path}/tables/schedulee`}>
+                            <div className="bg-white dark:bg-white/10 m-0 p-0 mb-[25px] rounded-10 relative">
+                                <div className="p-[25px]">
+                                    <Image
+                                        src="https://img.freepik.com/free-vector/blogging-isometric-concept-with-content-plan-making-process-3d-illustration_1284-55140.jpg?t=st=1730102135~exp=1730105735~hmac=20350ad6179fee3ee13647178630e2dfa6201ddc053b0ad78bb8955e2ca5844e&w=740"
+                                        width={430}
+                                        height={230}
+                                        alt=""
+                                    />
+                                    <h1 className="mb-0 text-lg text-dark dark:text-white/60 capitalize">
+                                        schedule repost
+                                    </h1>
+                                    <span className="capitalize fs-4">
+                                        Schedule Masssal, Sebelum anda
+                                        menggunakan schedule massal pastikan
+                                        anda membaca tata cara menggunakannya
+                                    </span>
+                                </div>
+                            </div>
+                        </Link>
                     </Col>
                 </Row>
             </main>
-
-            <Modal
-                visible={isModalVisible}
-                footer={null}
-                maskClosable={false}
-                style={{
-                    borderRadius: 12,
-                    padding: '20px',
-                    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-                }}
-            >
-                <div style={{ borderRadius: 12, padding: '20px' }}>
-                    <Spin tip="Menunggu..." spinning={formLoading} />
-                </div>
-            </Modal>
-        </div>
+        </>
     )
 }
 

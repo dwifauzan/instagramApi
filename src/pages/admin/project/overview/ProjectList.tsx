@@ -1,15 +1,9 @@
 import { useState, useEffect } from 'react'
 import { UilSetting, UilTrash } from '@iconscout/react-unicons'
-import {
-    Row,
-    Col,
-    Table,
-    Pagination,
-    Button,
-    Modal,
-} from 'antd'
+import { Row, Col, Table, Pagination, Button, Modal } from 'antd'
 import { useRouter } from 'next/router'
 import { useData } from '@/components/table/detailProvider'
+import axios from 'axios'
 
 interface Project {
     id: number
@@ -27,11 +21,11 @@ function ProjectList() {
         current: 1,
         pageSize: 10,
     })
-
     const { setData } = useData() as any
 
     useEffect(() => {
-        const getArsip = async () => {projects
+        const getArsip = async () => {
+            projects
             const response = await (window as any).electron.getFeedData()
             console.log(response)
             setProjects(response)
@@ -41,11 +35,24 @@ function ProjectList() {
 
     const lala = (index: number) => {
         setData(projects[index])
-        router.push({ pathname: `${path}/project/detailArsip/detail`})
+        router.push({ pathname: `${path}/project/detailArsip/detail` })
     }
 
-    const confirmDelete = () => {
-        console.log(`Project with id ${deleteProjectId} deleted`)
+    const confirmDelete = async () => {
+        if (deleteProjectId !== null) {
+            try {
+                await axios.delete(`/hexadash-nextjs/lib/${deleteProjectId}`)
+                setProjects((prevProjects) =>
+                    prevProjects.filter(
+                        (project) => project.id !== deleteProjectId
+                    )
+                )
+                setDeleteProjectId(null)
+                setIsDeleteModalVisible(false)
+            } catch (err) {
+                console.log(err)
+            }
+        }
         setDeleteProjectId(null)
         setIsDeleteModalVisible(false)
     }
@@ -86,9 +93,22 @@ function ProjectList() {
             </span>
         ),
         action: (
-            <div className='inline-flex gap-4'>
-                <button onClick={() => lala(index)} className='flex gap-3 bg-blue-600 text-white px-4 py-2 rounded-md shadow-sm text-base'><UilSetting/> Aksi</button>
-                <button className='flex gap-3 bg-red-600 text-white px-4 py-2 rounded-md shadow-sm text-base'><UilTrash/> Delete</button>
+            <div className="inline-flex gap-4">
+                <button
+                    onClick={() => lala(index)}
+                    className="flex gap-3 bg-blue-600 text-white px-4 py-2 rounded-md shadow-sm text-base"
+                >
+                    <UilSetting /> Aksi
+                </button>
+                <button
+                    className="flex gap-3 bg-red-600 text-white px-4 py-2 rounded-md shadow-sm text-base"
+                    onClick={() => {
+                        setIsDeleteModalVisible(true)
+                        setDeleteProjectId(project.id)
+                    }}
+                >
+                    <UilTrash /> Delete
+                </button>
             </div>
         ),
     }))
@@ -131,6 +151,27 @@ function ProjectList() {
                     </div>
                 </Col>
             </Row>
+            <Modal visible={isDeleteModalVisible} footer={null}>
+                <div className="py-12 px-5">
+                    <h4 className="font-normal">
+                        Apakah Anda yakin ingin menghapus arsip ini?
+                    </h4>
+                    <div className="mt-4 flex gap-5">
+                        <Button
+                            className="shadow-md text-base rounded-md w-full py-4"
+                            onClick={cancelDelete}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            className="bg-red-500 shadow-md text-base rounded-md text-white py-4 w-full"
+                            onClick={confirmDelete}
+                        >
+                            Submit
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </>
     )
 }

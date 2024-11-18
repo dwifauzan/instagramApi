@@ -22,7 +22,6 @@ import { useData } from '@/components/table/detailProvider'
 import axios from 'axios'
 import moment from 'moment'
 import { useNotification } from '../../crud/axios/handler/error'
-import LocationInput from '../../../../lib/auto-complete-input'
 
 interface FolderArsip {
     id: number
@@ -154,7 +153,6 @@ function ProjectDetail() {
     ]
 
     const handleSchedule = async (values: any) => {
-        console.log(values)
         setModalLoading(true)
         try {
             const accessToken = usersF.find(
@@ -169,9 +167,8 @@ function ProjectDetail() {
                 access_token: accessToken,
                 users: values.users_instagram, // Akun Instagram yang dipilih
                 perpostingan: values.batas_postingan,
-                location: values.locations, // Tambahkan lokasi ke payload
             }
-
+            console.log(payload)
             // Mengirimkan payload ke endpoint
             const response = await axios.post(
                 '/hexadash-nextjs/api/schedule',
@@ -460,7 +457,7 @@ function ProjectDetail() {
                                 />
                             </Form.Item>
 
-                            <Form.Item
+                            {/* <Form.Item
                                 name="locations"
                                 label="Lokasi"
                                 rules={[
@@ -471,7 +468,7 @@ function ProjectDetail() {
                                 ]}
                             >
                                 <LocationInput placeholder="Cari lokasi..." />
-                            </Form.Item>
+                            </Form.Item> */}
 
                             <Form.Item
                                 name="batas_postingan"
