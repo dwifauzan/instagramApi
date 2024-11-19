@@ -1,18 +1,10 @@
 // lib/instagram-private-api/services/instagramAuthService.ts
-import { PrismaClient, Prisma } from '@prisma/client'
-import { IgApiClient } from 'instagram-private-api'
+import { PrismaClient } from '@prisma/client'
 import { instagramSessionService } from './instagramSessionService'
 import { userInstagramService } from './userInstagramService'
+import { Services } from './services'
 
-export class InstagramAuthService {
-    private ig: IgApiClient
-    private prisma: Prisma.TransactionClient
-
-    constructor(prismaTransaction?: Prisma.TransactionClient) {
-        this.ig = new IgApiClient()
-        this.prisma = prismaTransaction || new PrismaClient()
-    }
-
+export class InstagramAuthService extends Services {
     public async login(name: string, username: string, password: string) {
         try {
             // Check if user exists
@@ -104,37 +96,55 @@ export class InstagramAuthService {
         const client = new PrismaClient()
 
         try {
-            return await client.$transaction(async (tx) => {
-                const session = await tx.instagramSession.findUnique({
-                    where: { userId },
-                    include: { user: true },
-                })
+            await this.serialize(userId)
 
-                if (!session) {
-                    throw new Error('No active session found')
-                }
+            // Attempt to logout
+            await this.ig.account.logout()
 
-                // Load session into Instagram API
-                this.ig.state.generateDevice(session.user.username)
-                await this.ig.state.deserialize(JSON.parse(session.session))
-                await this.ig.simulate.preLoginFlow()
-
-                // Attempt to logout
-                await this.ig.account.logout()
-
-                // Delete session
-                await tx.instagramSession.delete({
-                    where: { userId },
-                })
-
-                // Update user status
-                await tx.userInstagram.update({
-                    where: { id: userId },
-                    data: { status: 'logout' },
-                })
-
-                return true
+            // Delete session
+            await this.prisma.instagramSession.delete({
+                where: { userId },
             })
+
+            // Update user status
+            await this.prisma.userInstagram.update({
+                where: { id: userId },
+                data: { status: 'logout' },
+            })
+
+            return true
+
+            // return await client.$transaction(async (tx) => {
+            //     const session = await tx.instagramSession.findUnique({
+            //         where: { userId },
+            //         include: { user: true },
+            //     })
+
+            //     if (!session) {
+            //         throw new Error('No active session found')
+            //     }
+
+            //     // Load session into Instagram API
+            //     this.ig.state.generateDevice(session.user.username)
+            //     await this.ig.state.deserialize(JSON.parse(session.session))
+            //     await this.ig.simulate.preLoginFlow()
+
+            //     // Attempt to logout
+            //     await this.ig.account.logout()
+
+            //     // Delete session
+            //     await tx.instagramSession.delete({
+            //         where: { userId },
+            //     })
+
+            //     // Update user status
+            //     await tx.userInstagram.update({
+            //         where: { id: userId },
+            //         data: { status: 'logout' },
+            //     })
+
+            //     return true
+            // })
         } catch (error) {
             console.error('Logout error:', error)
             return false

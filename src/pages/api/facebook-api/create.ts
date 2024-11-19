@@ -1,6 +1,6 @@
 // pages/api/users/create.ts
 
-import { userInstagramService } from '@/lib/instagram-private-api/services/userInstagramService'
+import { userFacebookService } from '@/lib/facebook-scrapper/userFacebookService'
 import type { NextApiRequest, NextApiResponse } from 'next'
 
 export default async function handler(
@@ -9,7 +9,7 @@ export default async function handler(
 ) {
     if (req.method === 'POST') {
         try {
-            const newUser = await userInstagramService.create(req.body)
+            const newUser = await userFacebookService.create(req.body)
             res.status(201).json(newUser)
         } catch (error) {
             res.status(500).json({ error: 'Failed to create user' })

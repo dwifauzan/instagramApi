@@ -30,6 +30,15 @@ model InstagramSession {
   updatedAt DateTime      @updatedAt
 }
 
+//account meta 
+model UsersFacebook {
+  id            Int      @id @default(autoincrement())
+  name          String
+  access_token  String
+  userInstagram String
+  created_at    DateTime @default(now())
+}
+
 model Arsip {
   id           Int           @id @default(autoincrement())
   nama_arsip   String        @unique

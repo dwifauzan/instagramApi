@@ -19,6 +19,15 @@ CREATE TABLE "InstagramSession" (
 );
 
 -- CreateTable
+CREATE TABLE "UsersFacebook" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "name" TEXT NOT NULL,
+    "access_token" TEXT NOT NULL,
+    "userInstagram" TEXT NOT NULL,
+    "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateTable
 CREATE TABLE "Arsip" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "nama_arsip" TEXT NOT NULL,

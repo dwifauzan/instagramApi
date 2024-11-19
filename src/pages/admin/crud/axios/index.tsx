@@ -1,22 +1,22 @@
-import { Button, Form, Input, Modal, Spin, Table } from 'antd'
-import Link from 'next/link'
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/router'
-import { PageHeaders } from '@/components/page-headers'
-import { UilPlus, UilSearch } from '@iconscout/react-unicons'
-import { instagramApi } from '@/lib/api/instagram'
-import { useInstagram } from '@/hooks/useInstagram'
-import { useNotification } from './handler/error'
+import { Button, Form, Input, Modal, Spin, Table } from 'antd';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
+import { PageHeaders } from '@/components/page-headers';
+import { UilPlus, UilSearch } from '@iconscout/react-unicons';
+import { instagramApi } from '@/lib/api/instagram';
+import { useInstagram } from '@/hooks/useInstagram';
+import { useNotification } from './handler/error';
 
 interface User {
-    id: number
-    name: string
-    username: string
-    status: string
+    id: number;
+    name: string;
+    username: string;
+    status: string;
 }
 
 interface NotificationProps {
-    linkHref: string
+    linkHref: string;
 }
 
 const Notification: React.FC<NotificationProps> = ({ linkHref }) => (
@@ -28,71 +28,76 @@ const Notification: React.FC<NotificationProps> = ({ linkHref }) => (
             </Link>
         </Button>
     </div>
-)
+);
 
 const ViewPage: React.FC = () => {
-    const router = useRouter()
-    const [users, setUsers] = useState<User[]>([])
-    const [currentUser, setCurrentUser] = useState<string | null>(null)
-    const [isLoading, setIsLoading] = useState(true)
-    const [searchTerm, setSearchTerm] = useState('')
-    const [selectedUser, setSelectedUser] = useState<User | null>(null)
-    const [isLoginModalVisible, setIsLoginModalVisible] = useState(false)
-    const [isNotified, setIsNotified] = useState(false)
+    const router = useRouter();
+    const [users, setUsers] = useState<User[]>([]); // Inisialisasi dengan array kosong
+    const [currentUser, setCurrentUser] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+    const [isLoginModalVisible, setIsLoginModalVisible] = useState(false);
+    const [isNotified, setIsNotified] = useState(false);
 
-    const { openNotificationWithIcon, contextHolder } = useNotification()
+    const { openNotificationWithIcon, contextHolder } = useNotification();
 
-    const { login, logout, isLoading: authLoading } = useInstagram()
+    const { login, logout, isLoading: authLoading } = useInstagram();
 
     useEffect(() => {
-        fetchUsers()
-        checkNotification()
-        getDefaultAccount()
-    }, [])
+        fetchUsers();
+        checkNotification();
+        getDefaultAccount();
+    }, []);
 
     const getDefaultAccount = () => {
-        setCurrentUser(localStorage.getItem('default'))
-    }
+        setCurrentUser(localStorage.getItem('default'));
+    };
 
     const handleSetDefault = (name: string) => {
-        localStorage.setItem('default', name)
-        setCurrentUser(name)
+        localStorage.setItem('default', name);
+        setCurrentUser(name);
         openNotificationWithIcon(
             'success',
             'Default Account Updated',
             `${name} has been set as default account`
-        )
-    }
+        );
+    };
 
     const fetchUsers = async () => {
         try {
-            const response = await instagramApi.getUsers()
-            setUsers(response)
+            const response = await instagramApi.getUsers();
+            console.log('API Response:', response); // Debugging response
+            setUsers(Array.isArray(response) ? response : []); // Pastikan response adalah array
         } catch (error) {
             openNotificationWithIcon(
                 'error',
                 'Error',
                 'Failed to load user data. Please try again later.'
-            )
+            );
+            setUsers([]); // Set users sebagai array kosong jika error
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }
+    };
 
     const checkNotification = () => {
-        const readRepost = localStorage.getItem('retry-repost-route')
+        const readRepost = localStorage.getItem('retry-repost-route');
         if (readRepost && !isNotified) {
-            setIsNotified(true)
+            setIsNotified(true);
         }
-    }
+    };
 
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setSearchTerm(e.target.value.toLowerCase())
-    }
+        setSearchTerm(e.target.value.toLowerCase());
+    };
 
-    const filteredUsers = users.filter((user) =>
-        user.name.toLowerCase().includes(searchTerm)
-    )
+    // Validasi bahwa users adalah array sebelum memfilter
+    const filteredUsers = Array.isArray(users)
+        ? users.filter((user) =>
+              user.name.toLowerCase().includes(searchTerm)
+          )
+        : [];
 
     const columns = [
         {
@@ -154,43 +159,43 @@ const ViewPage: React.FC = () => {
                 </div>
             ),
         },
-    ]
+    ];
 
     const handleModalClose = () => {
-        setIsLoginModalVisible(false)
-        setSelectedUser(null)
-    }
+        setIsLoginModalVisible(false);
+        setSelectedUser(null);
+    };
 
     const handleLoginClick = (user: User) => {
-        setSelectedUser(user)
-        setIsLoginModalVisible(true)
-    }
+        setSelectedUser(user);
+        setIsLoginModalVisible(true);
+    };
 
     const handleLogoutClick = async (userId: number) => {
         try {
-            const success = await logout(userId)
+            const success = await logout(userId);
             if (success) {
                 openNotificationWithIcon(
                     'success',
                     'Logout Successful',
                     'User has been successfully logged out'
-                )
-                await fetchUsers()
+                );
+                await fetchUsers();
             } else {
                 openNotificationWithIcon(
                     'error',
                     'Logout Failed',
                     'Failed to logout user. Please try again.'
-                )
+                );
             }
         } catch (error) {
             openNotificationWithIcon(
                 'error',
                 'Error',
                 'An unexpected error occurred during logout'
-            )
+            );
         }
-    }
+    };
 
     const handleLoginSubmit = async (values: any) => {
         try {
@@ -198,30 +203,30 @@ const ViewPage: React.FC = () => {
                 selectedUser!.name,
                 values.username,
                 values.password
-            )
+            );
             if (result) {
                 openNotificationWithIcon(
                     'success',
                     'Login Successful',
                     `Successfully logged in as ${values.username}`
-                )
-                setIsLoginModalVisible(false)
-                await fetchUsers()
+                );
+                setIsLoginModalVisible(false);
+                await fetchUsers();
             } else {
                 openNotificationWithIcon(
                     'error',
                     'Login Failed',
                     'Invalid credentials or Instagram API error'
-                )
+                );
             }
         } catch (error) {
             openNotificationWithIcon(
                 'error',
                 'Error',
                 'An unexpected error occurred during login'
-            )
+            );
         }
-    }
+    };
 
     return (
         <div className="relative">
@@ -305,24 +310,21 @@ const ViewPage: React.FC = () => {
                                 },
                             ]}
                         >
-                            <Input.Password placeholder="Enter password" />
+                            <Input.Password />
                         </Form.Item>
 
-                        <Form.Item>
-                            <Button
-                                type="primary"
-                                htmlType="submit"
-                                loading={authLoading}
-                                className="w-full py-5"
-                            >
-                                Login
-                            </Button>
-                        </Form.Item>
+                        <Button
+                            type="primary"
+                            htmlType="submit"
+                            className="bg-primary w-full h-10"
+                        >
+                            Login
+                        </Button>
                     </Form>
                 )}
             </Modal>
         </div>
-    )
-}
+    );
+};
 
-export default ViewPage
+export default ViewPage;
