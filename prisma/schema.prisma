@@ -1,0 +1,80 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Instagram Accounts
+model UserInstagram {
+  id       Int               @id @default(autoincrement())
+  name     String            @unique
+  username String
+  password String
+  status   String
+  session  InstagramSession?
+}
+
+model InstagramSession {
+  id        Int           @id @default(autoincrement())
+  session   String
+  cookieJar String
+  userId    Int           @unique
+  user      UserInstagram @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+//account meta 
+
+model UsersFacebook {
+  id              Int              @id @default(autoincrement())
+  name            String
+  username        String
+  password        String
+  created_at      DateTime         @default(now())
+  AccountFacebook CookiesFacebook?
+}
+
+model CookiesFacebook {
+  id             Int           @id @default(autoincrement())
+  profilePic     String
+  access_token   String
+  userInstagram  String
+  userFacebookId Int           @unique
+  userFacebook   UsersFacebook @relation(fields: [userFacebookId], references: [id], onDelete: Cascade)
+  created_at     DateTime      @default(now())
+  updated_at     DateTime      @default(now())
+}
+
+model Arsip {
+  id           Int           @id @default(autoincrement())
+  nama_arsip   String        @unique
+  created_at   DateTime      @default(now())
+  folder_arsip FolderArsip[] @relation("ArsipToFolderArsip")
+}
+
+model DetailContent {
+  id            Int         @id @default(autoincrement())
+  file_path     String
+  media_type    Int
+  folderArsipId Int         @unique
+  folder_arsip  FolderArsip @relation("FolderArsipToDetailContent", fields: [folderArsipId], references: [id])
+}
+
+model FolderArsip {
+  id             Int            @id @default(autoincrement())
+  caption        String
+  like           Int
+  coment         Int
+  created_at     DateTime       @default(now())
+  status         String         @default("pending")
+  arsipId        Int
+  arsip          Arsip          @relation("ArsipToFolderArsip", fields: [arsipId], references: [id])
+  detail_content DetailContent? @relation("FolderArsipToDetailContent")
+}
