@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
-import DashboardChart from '@/components/charts/DashboardChart';
 import { chartLinearGradient } from '@/components/utilities';
 
 const salesRevenue = {
@@ -146,79 +145,7 @@ const SaleRevenue = React.memo(({ title }:any) => {
             </ul>
           </div>
           <div className="mt-3 hexadash-chart-container px-[25px] relative">
-            <DashboardChart
-              type="line"
-              id="hexadash-sales-revenue"
-              labels={salesRevenue[revenue as keyof revenueData].labels}
-              datasets={salesRevenueDatasets}
-              layout={{
-                padding: {
-                  left: -10,
-                  right: -10,
-                },
-              }}
-              scales={{
-                y: {
-                  border: { 
-                    dash: [4, 4],
-                   },
-                  grid: {
-                    color: '#485e9029',
-                    tickLength: 0,
-                    drawBorder: false,
-                  },
-                  ticks: {
-                    beginAtZero: true,
-                    font: {
-                      size: 13,
-                      family: "'Jost', sans-serif",
-                    },
-                    color: '#747474',
-                    max: 80,
-                    min: 0,
-                    stepSize: 20,
-                    padding: 10,
-                    callback(label:string) {
-                      return `${label}k`;
-                    },
-                  },
-                },
 
-                x: {
-                  border:{
-                    display: false,
-                  },
-                  grid: {
-                    display: false,
-                  },
-                  ticks: {
-                    beginAtZero: true,
-                    font: {
-                      size: 13,
-                      family: "'Jost', sans-serif",
-                    },
-                    color: '#747474',
-                  },
-                },
-              }}
-              tooltip={{
-                custom(tooltip:ToolTipProps) {
-                  if (!tooltip) return;
-                  tooltip.displayColors = false;
-                },
-                callbacks: {
-                  title() {
-                    return `Total Revenue`;
-                  },
-                  label(t:ToolTipProps) {
-                    const { formattedValue, dataset } = t;
-                    return `${formattedValue}k ${dataset.label}`;
-                  },
-                },
-              }}
-              height={window.innerWidth < 1399 ? (window.innerWidth < 575 ? 100 : 110) : 136}
-              option={options}
-            />
           </div>
         </div>
       )}

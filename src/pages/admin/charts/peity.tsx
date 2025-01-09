@@ -12,7 +12,7 @@ function Peity() {
     {
       path: 'first',
       breadcrumbName: 'Peity Chart',
-    },
+    }, 
   ];
   const [state, setState] = useState({
     responsive: 0,

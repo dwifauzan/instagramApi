@@ -11,10 +11,8 @@ import {
     Spin,
     Image,
 } from 'antd'
-import axios from 'axios'
 import useNotification from '@/pages/admin/crud/axios/handler/error'
 import { useRouter } from 'next/router'
-import { facebookApi } from '@/pages/api/useFacebook'
 
 const { Option } = Select
 
@@ -25,6 +23,10 @@ interface LocalData {
     userInstagram: string
     expired_at: string
     isActive: boolean
+    AccountFacebook?: {
+        userInstagram: string
+        access_token: string // Tambahkan ini
+    }
 }
 const SchedulePage = () => {
     const [localData, setLocalData] = useState<LocalData[]>([])
@@ -45,9 +47,19 @@ const SchedulePage = () => {
     useEffect(() => {
         const getUsers = async () => {
             try {
-                const response = await facebookApi.getUsers()
-                setUsersF(Array.isArray(response) ? response : [])
-                // console.log(response)
+                const response = await (window as any).electron.getAllUsers()
+                if (Array.isArray(response)) {
+                    setUsersF(response)
+                } else if (
+                    response &&
+                    typeof response === 'object' &&
+                    response.data
+                ) {
+                    setUsersF(Array.isArray(response.data) ? response.data : [])
+                } else {
+                    console.error('Unexpected response format:', response)
+                    setUsersF([])
+                }
             } catch (error) {
                 console.error('Error fetching users:', error)
                 setUsersF([])
@@ -84,7 +96,14 @@ const SchedulePage = () => {
 
     useEffect(() => {
         getRepostMedia()
-    }, [])
+        if (url && typeof url === 'string') {
+            if (url.includes('.mp4')) {
+                setMediaFiles(url)
+            } else {
+                setMediaFiles(url)
+            }
+        }
+    }, [url])
 
     const fetchCaptionFromFile = async () => {
         try {
@@ -99,32 +118,97 @@ const SchedulePage = () => {
     const handleSelectF = (value: number) => {
         setFSelected(value)
         const selectedUser = usersF.find((user) => user.id === value)
-        if (selectedUser) {
-            const instagramUsers = selectedUser.userInstagram.split(',')
+        if (selectedUser && selectedUser.AccountFacebook) {
+            const instagramUsers = selectedUser.AccountFacebook.userInstagram
+                ? selectedUser.AccountFacebook.userInstagram
+                      .split(',')
+                      .map((user: string) => user.trim())
+                      .filter((user: string) => user)
+                : []
             setUsersI(instagramUsers)
-            console.log(instagramUsers)
         }
     }
+
+    const [replaceAccount, setReplaceAccount] = useState(false) // State untuk checkbox
+
+    const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setReplaceAccount(e.target.checked)
+    }
+
+    let trueCaption = captionText
+    const replaceAccountInCaption = (caption: string, accountName: string) => {
+        try{
+            openNotificationWithIcon(
+                'success',
+                'report use new @',
+                'berhasil mengganti account dengan yang baru'
+            )
+            const regexSymbol = /@(\w+)/g 
+            trueCaption = trueCaption.replace(regexSymbol, (match) => {
+                const matched = match.substring(1)
+                if(matched === router.query.username){
+                    return match
+                }
+                return `@${accountName}`
+            })
+            console.log('ini yang replaceAccountInCaption ', trueCaption)
+        }catch(error){
+            openNotificationWithIcon(
+                'error',
+                'report use new @',
+                'gagal mengganti account dengan yang baru'
+            )
+        }
+    }
+    const replaceAccountInSymbol = (caption: string, accountName: string) => {
+        try{
+            openNotificationWithIcon(
+              'success',
+              'report success change symbol',
+              'berhasil mengubah symbol ke account'
+            )
+            const regexReplace = /{\[(.*?)\]}/g
+            trueCaption = trueCaption.replace(regexReplace, `@${accountName}`)
+            console.log('ini yang replaceAccountInSymbol ', trueCaption)
+        }catch(error){
+            openNotificationWithIcon(
+                'error',
+                'report failed change symbol',
+                'gagal mengubah symbol ke account'
+            )
+        }
+    }
+    const sumberPost = () => {
+        try{
+        openNotificationWithIcon('success', 'report success use credit', 'berhasil menggunakan account sumber postingan')
+        const sumberAccount = `${captionText}\n\nSumber postingan @${router.query.username}`
+        setCaptionText(sumberAccount)
+        }catch(error){
+          openNotificationWithIcon('error','report failed use credit', 'terjadi kesalahan saat apply')
+        }
+      }
 
     const handleRepost = async (values: any) => {
         setFormLoading(true)
         setIsModalVisible(true)
 
         try {
-            const accessToken = usersF.find(
-                (user: any) => user.id === fSelected
-            )?.access_token
-            const data = {
+            const selectedUser = usersF.find((user) => user.id === fSelected)
+            const accountName = values.users_instagram // Ambil nama akun dari selectedUser
+            const accessToken = selectedUser?.AccountFacebook?.access_token
+            await new Promise((resolve) => setTimeout(resolve, 2000))
+            replaceAccountInCaption(captionText, accountName)
+            await new Promise((resolve) => setTimeout(resolve, 2000))
+            replaceAccountInSymbol(captionText, accountName)
+            await new Promise((resolve) => setTimeout(resolve, 2000))
+            const dataRepostL = {
                 access_token: accessToken,
                 users: values.users_instagram, // Akun Instagram yang dipilih
-                caption: captionText,
+                caption: trueCaption,
                 mediaFiles: JSON.parse(url as string),
             }
-
-            const response = await axios.post(
-                '/hexadash-nextjs/api/postLangsung',
-                data
-            )
+            console.log(dataRepostL.mediaFiles)
+            const response = await (window as any).electron.handleRepostLangsung(dataRepostL)
 
             if (response.status === 201) {
                 const result = response.data
@@ -180,17 +264,16 @@ const SchedulePage = () => {
                                         placeholder="Select Users Facebook"
                                         onChange={handleSelectF}
                                     >
-                                        {usersF?.map((user: any) => (
+                                        {usersF.map((user) => (
                                             <Select.Option
-                                                value={user.id}
                                                 key={user.id}
+                                                value={user.id}
                                             >
                                                 {user.name}
                                             </Select.Option>
                                         ))}
                                     </Select>
                                 </Form.Item>
-
                                 <Form.Item
                                     name="users_instagram"
                                     label="Akun Instagram terkait"
@@ -204,13 +287,20 @@ const SchedulePage = () => {
                                     <Select
                                         mode="multiple"
                                         placeholder="Select Users Instagram"
-                                        options={usersI?.map((user) => ({
+                                        options={usersI.map((user) => ({
                                             value: user,
-                                            label: user, // Menampilkan nama Instagram yang sudah ada di state
+                                            label: user,
                                         }))}
+                                        disabled={!fSelected}
+                                        notFoundContent={
+                                            fSelected
+                                                ? 'No Instagram accounts found'
+                                                : 'Please select Facebook account first'
+                                        }
                                     />
                                 </Form.Item>
-
+                                <p>Catatan :</p>
+                                <span>{'Silahkan inputkan {[username]} pada caption untuk menambahkan username sesuai dengan username yang di posting'}</span>
                                 <Input.TextArea
                                     rows={12}
                                     placeholder="Masukkan caption di sini..."
@@ -220,7 +310,6 @@ const SchedulePage = () => {
                                     }
                                     className="text-base"
                                 />
-
                                 <Button
                                     type="dashed"
                                     onClick={fetchCaptionFromFile}
@@ -228,11 +317,18 @@ const SchedulePage = () => {
                                 >
                                     Gunakan Caption
                                 </Button>
-
+                                <Button type='default' onClick={sumberPost} className='mt-2'>
+                                  Sumber Postingan
+                                </Button>
+                                <input
+                                    type="checkbox"
+                                    checked={replaceAccount}
+                                    onChange={handleCheckboxChange}
+                                />
+                                Replace Account dengan Account anda
                                 <Form.Item label="Lokasi" name="location">
                                     <Input placeholder="Masukkan lokasi..." />
                                 </Form.Item>
-
                                 <Form.Item>
                                     <Button
                                         type="primary"
@@ -252,41 +348,24 @@ const SchedulePage = () => {
                             className="max-w-[450px] aspect-square rounded-lg shadow-md"
                         >
                             {mediaFiles ? (
-                                // Pastikan mediaFiles adalah string
-                                typeof mediaFiles === 'string' ? (
-                                    (console.log('Media Files:', mediaFiles), // Debugging log
-                                    mediaFiles.includes('.mp4') ? (
-                                        <video
-                                            className="w-full h-auto"
-                                            controls
-                                            src={mediaFiles}
-                                            // / Tambahkan alt di sini jika perlu
-                                        />
-                                    ) : mediaFiles.includes('.jpg') ||
-                                      mediaFiles.includes('.webp') ||
-                                      mediaFiles.includes('.png') ? (
-                                        <Image
-                                            className="w-full"
-                                            src={mediaFiles}
-                                            alt="Pratinjau Media"
-                                            fallback="https://via.placeholder.com/450" // Fallback image jika gagal
-                                        />
-                                    ) : (
-                                        <p className="text-center text-gray-500">
-                                            Format media tidak didukung
-                                        </p>
-                                    ))
+                                mediaFiles.endsWith('.mp4') ? (
+                                    <video
+                                        className="w-full h-auto"
+                                        controls
+                                        src={mediaFiles}
+                                    />
                                 ) : (
-                                    <p className="text-center text-gray-500">
-                                        MediaFiles tidak dapat ditampilkan
-                                    </p>
+                                    <Image
+                                        className="w-full"
+                                        src={mediaFiles}
+                                        alt="Pratinjau Media"
+                                    />
                                 )
                             ) : (
                                 <p className="text-center text-gray-500">
                                     Tidak ada media yang tersedia
                                 </p>
                             )}
-
                             <div className="p-2 text-left">
                                 <p className="line-clamp-4 text-base">
                                     {captionText}

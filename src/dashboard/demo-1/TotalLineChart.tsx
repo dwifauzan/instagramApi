@@ -4,7 +4,6 @@ import {
   UilArrowDown,
   UilArrowUp,
 } from '@iconscout/react-unicons';
-import DashboardChart from '@/components/charts/DashboardChart';
 
 import totalChartData from '../../demoData/TotalSaleChart.json';
 
@@ -54,48 +53,6 @@ const TotalLineChart = React.memo(() => {
                   </div>
                 </div>
                 <div className="hexadash-chart-container p-[25px] ltr:pl-[15px] rtl:pr-[15px] pt-[5px] relative">
-                  <DashboardChart
-                    labels={item.labels}
-                    id={`id_${i}`}
-                    datasets={[
-                      {
-                        data: item.data,
-                        borderColor: item.lineColor,
-                        borderWidth: 3,
-                        fill: false,
-                        pointBackgroundColor: '#FA8B0C',
-                        pointBorderColor: '#fff',
-                        pointHoverBorderColor: '#fff',
-                        pointBorderWidth: 0,
-                        pointHoverBorderWidth: 0,
-                        pointHoverRadius: 0,
-                        z: 5,
-                      },
-                    ]}
-                    height={window.innerWidth <= 575 ? 200 : 180}
-                    tooltip={{
-                      custom(tooltip:Tooltip) {
-                        if (!tooltip) return;
-                        tooltip.displayColors = false;
-                      },
-                      callbacks: {
-                        title(t:Tooltip) {
-                          const { label } = t;
-                          return `${label}`;
-                        },
-                        label(t:Tooltip) {
-                          const { formattedValue } = t;
-                          return `  ${item.title}: ${formattedValue}k`;
-                        },
-                        labelColor() {
-                          return {
-                            backgroundColor: item.lineColor,
-                            borderColor: 'transparent',
-                          };
-                        },
-                      },
-                    }}
-                  />
                 </div>
               </div>
             </div>

@@ -12,15 +12,10 @@ import {
     Select,
     Input,
 } from 'antd'
-import Image from 'next/image'
 import { UilFile, UilHeart, UilRepeat } from '@iconscout/react-unicons'
 import { PageHeaders } from '@/components/page-headers'
 import useNotification from '../../crud/axios/handler/error'
-import axios from 'axios'
-import { useInstagram } from '@/pages/api/hooks/useInstagram'
 import { useCache } from '@/pages/api/hooks/useCache'
-import Link from 'next/link'
-
 const { Option } = Select
 
 interface MediaItem {
@@ -31,6 +26,7 @@ interface MediaItem {
 interface sendFeed {
     url: string[]
     caption: string
+    username?: string
 }
 
 interface Feed {
@@ -40,6 +36,7 @@ interface Feed {
     caption: string
     likeCount: number
     commentCount: number
+    username: string
     takenAt: Date
 }
 
@@ -58,13 +55,20 @@ const MediaRenderer = ({
 }) => {
     if (media.mediaType === 'photo') {
         return (
-            <Image
+            <img
                 src={media.url}
                 alt={media.mediaType}
                 width={450}
                 height={550}
                 className={className}
-                // onError={() => setError(true)}
+                referrerPolicy="no-referrer" // Add this
+                crossOrigin="anonymous"      // Add this
+                onError={(e) => {
+                    // Fallback if image fails to load
+                    const imgElement = e.target as HTMLImageElement;
+                    imgElement.onerror = null; // Prevent infinite loop
+                    imgElement.src = '/path/to/fallback-image.jpg'; // Add a fallback image
+                }}
             />
         )
     } else {
@@ -72,7 +76,6 @@ const MediaRenderer = ({
             <video
                 controls
                 className={className}
-                // onError={() => setError(true)}
             >
                 <source src={media.url} type="video/mp4" />
             </video>
@@ -110,8 +113,7 @@ function BlogTwo() {
     const scrollRef = useRef<HTMLDivElement | null>(null)
     const path = '/admin'
     const [feed, setFeed] = useState<sendFeed | null>(null)
-
-    const { getFeedsByHashtag, isLoading, error } = useInstagram()
+    const [repostModalVisible, setRepostModalVisible] = useState(false)
 
     const filteredFeeds = useMemo(() => {
         return feeds.filter((feed) => {
@@ -150,10 +152,25 @@ function BlogTwo() {
     }, [filteredFeeds, sortCriteria])
 
     useEffect(() => {
-        if (router.query.name) {
-            fetchFeeds()
+        if (router.query.response) {
+            const responseParse = JSON.parse(router.query.response as string)
+            console.log('response parse   ',responseParse.data.nextMaxId)
+            const cacheKey = `feeds_${router.query.response}`
+            setFeeds((prevFeeds) => {
+                const existingFeedIds = new Set(prevFeeds.map((feed) => feed.id))
+                const newFeeds = responseParse.data.feeds.filter(
+                    (feed: Feed) => !existingFeedIds.has(feed.id)
+                )
+                const updatedFeeds = [...prevFeeds, ...newFeeds]
+                setNextMaxPage(responseParse.data.nextMaxId)
+                setCacheItem(cacheKey, {
+                    feeds: updatedFeeds,
+                    nextMaxPage: responseParse.data.nextMaxId,
+                })
+                return updatedFeeds
+            })
         }
-    }, [router.query.name]) // Tambahkan dependency
+    }, [router.query.response]) // Tambahkan dependency
 
     const fetchFeeds = async () => {
         const cacheKey = `feeds_${router.query.name}`
@@ -189,18 +206,19 @@ function BlogTwo() {
                     return
                 }
             }
-
-            const response = await getFeedsByHashtag(
-                router.query.name as string,
-                defaultAccount,
-                nextMaxPage ?? undefined
-            )
+    
+            const dataHastags = {
+                query: router.query.name as string,
+                username: defaultAccount,
+                nextMaxId: nextMaxPage ?? undefined
+            }
+            const response = await (window as any).electron.getFeedsByHastag(dataHastags)
 
             if (!response.success) {
                 throw new Error(response.message || 'Error get feeds')
             }
 
-            if (!response.feeds?.length) {
+            if (!response.data.feeds?.length) {
                 openNotificationWithIcon(
                     'error',
                     'No more feeds',
@@ -208,26 +226,25 @@ function BlogTwo() {
                 )
                 return
             }
-
+            console.log('ini adalah response', response.data)
+            console.log('ini adalah response2', response.data.feeds)
             setFeeds((prevFeeds) => {
-                const existingFeedIds = new Set(
-                    prevFeeds.map((feed) => feed.id)
-                )
-                const newFeeds = response.feeds.filter(
+                const existingFeedIds = new Set(prevFeeds.map((feed) => feed.id))
+                const newFeeds = response.data.feeds.filter(
                     (feed: Feed) => !existingFeedIds.has(feed.id)
                 )
                 const updatedFeeds = [...prevFeeds, ...newFeeds]
                 setCacheItem(cacheKey, {
                     feeds: updatedFeeds,
-                    nextMaxPage: response.nextMaxId,
+                    nextMaxPage: response.data.nextMaxId,
                 })
                 return updatedFeeds
             })
 
-            setNextMaxPage(response.nextMaxId)
-        } catch (err: any) {
-            console.error('Failed to load feeds:', err)
-            openNotificationWithIcon('error', 'Failed to load', err.message)
+            setNextMaxPage(response.data.nextMaxId)
+        } catch (error: any) {
+            // console.error('Failed to load feeds:', err)
+            openNotificationWithIcon('error', 'Failed to load', error)
         } finally {
             setLoading(false)
             setIsLoadingMore(false)
@@ -285,6 +302,7 @@ function BlogTwo() {
                 mediaItems: feed.mediaItems.filter((media) =>
                     selectedMedia.has(`${feed.id}-${media.url}`)
                 ),
+                sumber: feed.username || 'unknown'
             }))
             .filter((feed) => feed.mediaItems.length > 0)
 
@@ -347,23 +365,25 @@ function BlogTwo() {
     }
 
     const handlerRepost = async (feed: Feed) => {
-        setModalVisible(true)
         const sendThis = {
             url: feed.mediaItems.map((media) => media.url),
             caption: feed.caption,
+            username: feed.username
         }
         console.log(sendThis)
         setFeed(sendThis)
+        setRepostModalVisible(true)
     }
 
     const handlerRepostLangsung = () => {
-        setModalVisible(true)
+        setRepostModalVisible(true)
         try {
             router.push({
                 pathname: `${path}/tables/schedule`,
                 query: {
                     url: JSON.stringify(feed?.url),
                     caption: feed?.caption,
+                    username: feed?.username
                 },
             })
             openNotificationWithIcon(
@@ -381,13 +401,14 @@ function BlogTwo() {
     }
 
     const handlerRepostSchedule = () => {
-        setModalVisible(true)
+        setRepostModalVisible(true)
         try {
             router.push({
                 pathname: `${path}/tables/schedulee`,
                 query: {
                     url: JSON.stringify(feed?.url),
                     caption: feed?.caption,
+                    username: feed?.username
                 },
             })
             openNotificationWithIcon(
@@ -550,21 +571,29 @@ function BlogTwo() {
                                                     toggleSelectMedia(feed)
                                                 }}
                                             />
-                                            <Image
-                                                src={feed.mediaItems[0].url}
+                                            <img
+                                                src={feed.mediaItems[0]?.url}
                                                 alt={
                                                     feed.mediaItems[0].mediaType
                                                 }
                                                 width={250}
                                                 height={350}
                                                 className="rounded-md"
+                                                referrerPolicy="no-referrer"
+                                                crossOrigin="anonymous"
+                                                onError={(e) => {
+                                                    // Fallback if image fails to load
+                                                    const imgElement = e.target as HTMLImageElement;
+                                                    imgElement.onerror = null; // Prevent infinite loop
+                                                    imgElement.src = '/path/to/fallback-image.jpg'; // Add a fallback image
+                                                }}
                                             />
                                         </>
                                     ) : (
                                         <>
                                             <Checkbox
                                                 checked={selectedMedia.has(
-                                                    `${feed.id}-${feed.mediaItems[0].url}`
+                                                    `${feed.id}-${feed.mediaItems[0]?.url}`
                                                 )}
                                                 onChange={(e) => {
                                                     e.stopPropagation()
@@ -612,7 +641,7 @@ function BlogTwo() {
                     </Row>
                 </main>
             </Spin>
-            <div
+                <div
                 className={`fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 ${
                     modalVisibleArsip ? 'block' : 'hidden'
                 }`}
@@ -666,7 +695,7 @@ function BlogTwo() {
                         </button>
                     </div>
                 </div>
-            </div>
+                </div>
 
             <div className="mt-4 flex justify-center">
                 {isLoadingMore ? (
@@ -703,7 +732,8 @@ function BlogTwo() {
 
             {/* pop up ui repost */}
             <Modal
-                visible={modalVisible}
+                open={repostModalVisible}
+                onCancel={() => setRepostModalVisible(false)}
                 footer={null}
                 className="px-3 py-5 bg-white shadow rounded"
             >
@@ -714,7 +744,7 @@ function BlogTwo() {
                             onClick={handlerRepostLangsung}
                         >
                             <div className="p-[25px]">
-                                <Image
+                                <img
                                     src="https://img.freepik.com/free-vector/appointment-booking-mobile-phone-with-calendar_23-2148550000.jpg?t=st=1730102155~exp=1730105755~hmac=6702631bf2696197b5d799acb373b4f0c4b676a7c58bb97a73984cd88b735cff&w=740"
                                     width={430}
                                     height={230}
@@ -736,7 +766,7 @@ function BlogTwo() {
                             className="bg-white dark:bg-white/10 m-0 p-0 mb-[25px] rounded-10 relative"
                         >
                             <div className="p-[25px]">
-                                <Image
+                                <img
                                     src="https://img.freepik.com/free-vector/blogging-isometric-concept-with-content-plan-making-process-3d-illustration_1284-55140.jpg?t=st=1730102135~exp=1730105735~hmac=20350ad6179fee3ee13647178630e2dfa6201ddc053b0ad78bb8955e2ca5844e&w=740"
                                     width={430}
                                     height={230}

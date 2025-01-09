@@ -9,7 +9,6 @@ import {
   UilFile,
   UilTimes,
 } from '@iconscout/react-unicons';
-import DashboardChart from '@/components/charts/DashboardChart';
 import { Cards } from '@/components/cards/frame/cards-frame';
 import { customTooltips } from '@/components/utilities';
 
@@ -172,74 +171,6 @@ const SalesReport = React.memo((title:any) => {
             </div>
           </div>
           <div className="mt-3 hexadash-chart-container relative">
-            <DashboardChart
-              type="line"
-              id="hexadash-sales-revenue"
-              labels={salesRevenue.labels}
-              datasets={salesRevenueDatasets}
-              layout={{
-                padding: {
-                  left: -10,
-                  right: -10,
-                },
-              }}
-              scales={{
-                y: {
-                  border: { 
-                    dash: [4, 4],
-                   },
-                  grid: {
-                    color: '#485e9029',
-                    tickLength: 0,
-                    drawBorder: false,
-                  },
-                  ticks: {
-                    beginAtZero: true,
-                    font: {
-                      size: 13,
-                      family: "'Jost', sans-serif",
-                    },
-                    color: '#747474',
-                    max: 80,
-                    min: 50,
-                    stepSize: 20,
-                    padding: 10,
-                    callback(label:number) {
-                      return `${label}k`;
-                    },
-                  },
-                },
-
-                x: {
-                  border: {
-                    display: false,
-                  },
-                  grid: {
-                    display: false,
-                  },
-                  ticks: {
-                    font: {
-                      size: 13,
-                      family: "'Jost', sans-serif",
-                    },
-                    color: '#747474',
-                  },
-                },
-              }}
-              tooltip={{
-                custom: customTooltips,
-                callbacks: {
-                  title() {
-                    return `Total Revenue`;
-                  },
-                  label(t:Value) {
-                    const { formattedValue, dataset } = t;
-                    return `${dataset.label}: ${formattedValue}k`;
-                  },
-                },
-              }}
-              height={window.innerWidth < 1399 ? (window.innerWidth < 575 ? 175 : 100) : 100}
-            />
           </div>
         </Cards>
       )}

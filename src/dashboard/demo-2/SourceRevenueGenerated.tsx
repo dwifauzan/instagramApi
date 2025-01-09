@@ -13,7 +13,6 @@ import {
 } from '@iconscout/react-unicons';
 import config from '../../config/config';
 import { Cards } from '@/components/cards/frame/cards-frame';
-import DashboardChart from '@/components/charts/DashboardChart';
 
 interface RootState {
   ChangeLayoutMode: {
@@ -154,7 +153,6 @@ const SourceRevenueGenerated = React.memo(() => {
         more={moreContent}
       >
         <div className="hexadash-chart-container relative flex items-center justify-between flex-wrap gap-y-[20px] py-[20px] sm:pt-0 px-[25px] 3xl:justify-center lg:justify-start md:justify-center gap-x-[20px] [&>.chartjs-tooltip>table>tbody>tr>td]:text-dark dark:[&>.chartjs-tooltip>table>tbody>tr>td]:text-white/60">
-          <DashboardChart {...chartjsPieChart} type="pie" id="pieChart" />
           <div className="flex flex-wrap gap-x-[44px] gap-y-[22px] ssm:gap-x-[15px] ssm:gap-y-[15px] ssm:justify-center">
             <div>
               <div className="flex items-center justify-center bg-info-transparent text-info w-[80px] h-[80px] mb-[10px] rounded-[10px]">

@@ -6,9 +6,7 @@ contextBridge.exposeInMainWorld('electron', {
     startDownload: (nameArsip, feed, signal) =>
         ipcRenderer.invoke('startDownload', nameArsip, feed, signal),
     getFeedData: () => ipcRenderer.invoke('getFeedData'),
-    // sksalkfa: {
-    //     accountMeta: () => ipcRenderer.invoke('createAccount')
-    // }
+    
     createAccount: (accountForm) => ipcRenderer.invoke("createAccount", accountForm),
     handlerCokies: (dataCokies) => ipcRenderer.invoke("handlerCokiess", dataCokies),
     getAllUsers: (args) => ipcRenderer.invoke("getAllUsers", args),
@@ -23,5 +21,16 @@ contextBridge.exposeInMainWorld('electron', {
     deleteUsersIg: (id) => ipcRenderer.invoke("deleteUsersIg", id),
 
     //instagram riset
-    search: (dataSearch) => ipcRenderer.invoke("search", dataSearch)
+    search: (dataSearch) => ipcRenderer.invoke("search", dataSearch),
+    getFeedsByHastag: (dataHastags) => ipcRenderer.invoke("getFeedsByHastag", dataHastags),
+    getFeedsByUsername: (dataAccount) => ipcRenderer.invoke("getFeedsByUsername", dataAccount),
+    getFeedsByLocation: (dataLocation) => ipcRenderer.invoke("getFeedsByLocation", dataLocation),
+
+    //arsip
+    handleArsip: (dataArsip) => ipcRenderer.invoke("handleArsip", dataArsip),
+    deleteFolderArsip: (id) => ipcRenderer.invoke("deleteFolderArsip", id),
+
+    //repost
+    handleRepostLangsung: (dataRepostL) => ipcRenderer.invoke("handleRepostLangsung", dataRepostL),
+    handleRepostSchedule: (dataRepostS) => ipcRenderer.invoke("handleRepostSchedule", dataRepostS)
 })

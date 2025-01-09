@@ -39,6 +39,10 @@ const ViewPage: React.FC = () => {
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [isLoginModalVisible, setIsLoginModalVisible] = useState(false);
     const [isNotified, setIsNotified] = useState(false);
+    const [clickedUsernames, setClickedUsernames] = useState<{ [key: string]: string }>({});
+    const [originalUsernames, setOriginalUsernames] = useState<{ [key: string]: string }>({});
+    const [loginUsername, setLoginUsername] = useState<string>('');
+    const [isLoginProcessing, setIsLoginProcessing] = useState(false);
 
     const { openNotificationWithIcon, contextHolder } = useNotification();
 
@@ -116,6 +120,45 @@ const ViewPage: React.FC = () => {
           )
         : [];
 
+    const handleUsernameClick = (username: string) => {
+        if (!originalUsernames[username]) {
+            setOriginalUsernames(prev => ({
+                ...prev,
+                [username]: username
+            }));
+        }
+
+        // Get all usernames except the current one
+        const otherUsernames = users
+            .map(user => user.username)
+            .filter(name => name !== username);
+
+        // If username hasn't been clicked before or has cycled through all options
+        if (!clickedUsernames[username] || !otherUsernames.includes(clickedUsernames[username])) {
+            const newUsername = otherUsernames[0];
+            setClickedUsernames(prev => ({
+                ...prev,
+                [username]: newUsername
+            }));
+            // Update loginUsername if this is the currently selected user
+            if (selectedUser && selectedUser.username === username) {
+                setLoginUsername(newUsername);
+            }
+        } else {
+            // Find next username in cycle
+            const currentIndex = otherUsernames.indexOf(clickedUsernames[username]);
+            const nextUsername = otherUsernames[(currentIndex + 1) % otherUsernames.length];
+            setClickedUsernames(prev => ({
+                ...prev,
+                [username]: nextUsername
+            }));
+            // Update loginUsername if this is the currently selected user
+            if (selectedUser && selectedUser.username === username) {
+                setLoginUsername(nextUsername);
+            }
+        }
+    };
+
     const columns = [
         {
             title: 'ID',
@@ -131,6 +174,14 @@ const ViewPage: React.FC = () => {
             title: 'Username',
             dataIndex: 'username',
             key: 'username',
+            render: (username: string) => (
+                <span 
+                    onClick={() => handleUsernameClick(username)}
+                    style={{ cursor: 'pointer' }}
+                >
+                    {originalUsernames[username] || username}
+                </span>
+            )
         },
         {
             title: 'Actions',
@@ -160,7 +211,7 @@ const ViewPage: React.FC = () => {
                     <Button
                         onClick={() =>
                             record.status !== 'login'
-                                ? handleLoginClick(record)
+                                ? handleLoginSubmit(record.id)
                                 : handleLogoutClick(record.id)
                         }
                         loading={authLoading}
@@ -181,16 +232,6 @@ const ViewPage: React.FC = () => {
             ),
         },
     ];
-
-    const handleModalClose = () => {
-        setIsLoginModalVisible(false);
-        setSelectedUser(null);
-    };
-
-    const handleLoginClick = (user: User) => {
-        setSelectedUser(user);
-        setIsLoginModalVisible(true);
-    };
 
     const handleLogoutClick = async (id: number) => {
         try {
@@ -218,27 +259,22 @@ const ViewPage: React.FC = () => {
         }
     };
 
-    const handleLoginSubmit = async (values: any) => {
-        const instagramId = selectedUser?.id
-        if(!instagramId){
-            openNotificationWithIcon(
-                'error',
-                'Login Failed',
-                'Invalid id taken at'
-            );
+    const handleLoginSubmit = async (id: number) => {
+        setIsLoginProcessing(true);
+        const instagramId = id;
+        const matchedUser = users.find(user => user.id === instagramId);
+
+        if(matchedUser){
+            console.log(`matched this ${matchedUser}`);
         }
-        const userLogin = {
-            id: instagramId,
-            username: values.username,
-            password: values.password
-        }
+
         try {
-            const result = await (window as any).electron.loginPrivate(userLogin)
+            const result = await (window as any).electron.loginPrivate(matchedUser);
             if (result) {
                 openNotificationWithIcon(
                     'success',
                     'Login Successful',
-                    `Successfully logged in as ${values.username}`
+                    `Successfully logged in as ${loginUsername}`
                 );
                 setIsLoginModalVisible(false);
                 await fetchUsers();
@@ -249,6 +285,8 @@ const ViewPage: React.FC = () => {
                 'Error',
                 'An unexpected error occurred during login'
             );
+        } finally {
+            setIsLoginProcessing(false);
         }
     };
 
@@ -301,52 +339,30 @@ const ViewPage: React.FC = () => {
             </div>
 
             <Modal
-                open={isLoginModalVisible}
-                onCancel={handleModalClose}
+                open={isLoginProcessing}
                 footer={null}
-                className="p-10"
+                closable={false}
+                centered
+                width={400}
+                className="p-0"
             >
-                {selectedUser && (
-                    <Form
-                        className="p-10"
-                        onFinish={handleLoginSubmit}
-                        layout="vertical"
-                    >
-                        <h2 className="mb-5 text-lg font-semibold">
-                            Login Account
-                        </h2>
-
-                        <Form.Item
-                            name="username"
-                            label="Username"
-                            initialValue={selectedUser.username}
-                        >
-                            <Input disabled />
-                        </Form.Item>
-
-                        <Form.Item
-                            name="password"
-                            label="Password"
-                            rules={[
-                                {
-                                    required: true,
-                                    message: 'Please input your password!',
-                                },
-                            ]}
-                        >
-                            <Input.Password />
-                        </Form.Item>
-
-                        <Button
-                            type="primary"
-                            htmlType="submit"
-                            className="bg-primary w-full h-10"
-
-                        >
-                            Login
-                        </Button>
-                    </Form>
-                )}
+                <div className="flex flex-col items-center justify-center py-8 px-6 text-center">
+                    <Spin size="large" className="mb-6" />
+                    <h2 className="text-xl font-semibold mb-4 text-gray-800">
+                        Processing Request
+                    </h2>
+                    <div className="space-y-2 text-gray-600">
+                        <p className="text-base">
+                            Connecting to Instagram...
+                        </p>
+                        <p className="text-sm">
+                            Please wait while we process your request
+                        </p>
+                    </div>
+                    <div className="mt-6 w-full max-w-xs bg-gray-200 rounded-full h-1.5">
+                        <div className="bg-blue-500 h-1.5 rounded-full animate-pulse"></div>
+                    </div>
+                </div>
             </Modal>
         </div>
     );

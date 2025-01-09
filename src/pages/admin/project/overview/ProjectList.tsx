@@ -3,7 +3,7 @@ import { UilSetting, UilTrash } from '@iconscout/react-unicons'
 import { Row, Col, Table, Pagination, Button, Modal } from 'antd'
 import { useRouter } from 'next/router'
 import { useData } from '@/components/table/detailProvider'
-import axios from 'axios'
+import useNotification from '../../crud/axios/handler/error'
 
 interface Project {
     id: number
@@ -22,36 +22,41 @@ function ProjectList() {
         pageSize: 10,
     })
     const { setData } = useData() as any
+    const { openNotificationWithIcon, contextHolder } = useNotification()
+
+    const getArsip = async () => {
+        projects
+        const response = await (window as any).electron.getFeedData()
+        console.log(response)
+        setProjects(response)
+    }
 
     useEffect(() => {
-        const getArsip = async () => {
-            projects
-            const response = await (window as any).electron.getFeedData()
-            console.log(response)
-            setProjects(response)
-        }
         getArsip()
     }, [])
 
-    const lala = (index: number) => {
-        setData(projects[index])
+    const lala = (id: number) => {
+        const selectedData = projects[id]
+        setData(selectedData)
+        console.log('ini adalah setData ', selectedData)
+        console.log('oke ', projects[id])
         router.push({ pathname: `${path}/project/detailArsip/detail` })
     }
 
     const confirmDelete = async () => {
-        if (deleteProjectId !== null) {
-            try {
-                await axios.delete(`/hexadash-nextjs/lib/${deleteProjectId}`)
-                setProjects((prevProjects) =>
-                    prevProjects.filter(
-                        (project) => project.id !== deleteProjectId
-                    )
-                )
-                setDeleteProjectId(null)
-                setIsDeleteModalVisible(false)
-            } catch (err) {
-                console.log(err)
+        console.log(deleteProjectId)
+        try {
+            const responseHapus = await (window as any).electron.deleteFolderArsip(deleteProjectId)
+            const messageString = JSON.stringify(responseHapus)
+            const objectMessage = JSON.parse(messageString)
+            if (objectMessage.status === 200) {
+                openNotificationWithIcon('success', 'success delete arsip', objectMessage.message)
+                await getArsip()
             }
+            setDeleteProjectId(null)
+            setIsDeleteModalVisible(false)
+        } catch (err) {
+            console.log(err)
         }
         setDeleteProjectId(null)
         setIsDeleteModalVisible(false)
@@ -138,6 +143,7 @@ function ProjectList() {
 
     return (
         <>
+        {contextHolder}
             <Row gutter={25}>
                 <Col xs={24}>
                     <div className="bg-white dark:bg-[#202531] py-[25px] px-[25px] rounded-[10px]">

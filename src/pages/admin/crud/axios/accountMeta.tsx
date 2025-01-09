@@ -12,6 +12,7 @@ import {
 } from 'antd'
 import { PageHeaders } from '@/components/page-headers'
 import { UserOutlined, DeleteOutlined } from '@ant-design/icons'
+import useNotification  from './handler/error';
 
 interface LocalData {
     id: number
@@ -27,6 +28,8 @@ function ViewPage() {
     const [isLoading, setIsLoading] = useState<boolean>(true)
     const [form] = Form.useForm()
     const [showForm, setShowForm] = useState(false)
+    const { openNotificationWithIcon, contextHolder } = useNotification();
+
 
     const openNotification = (type: 'success' | 'error', message: string) => {
         notification[type]({ message })
@@ -62,7 +65,6 @@ function ViewPage() {
         try {
             const result = await (window as any).electron.getAllUsers()
             console.log(result)
-
             // Transformasi data
             const transformedData = Array.isArray(result)
                 ? result.map((item: any) => ({
@@ -91,8 +93,12 @@ function ViewPage() {
         if (!id) return
         try {
             const response = await (window as any).electron.deleteUsers(id)
-            openNotification('success', 'Account deleted successfully!')
-            getLocalData()
+            const messageString = JSON.stringify(response)
+            const objectMessage = JSON.parse(messageString)
+            if(objectMessage.status === 200){
+                openNotificationWithIcon('success', 'Account deleted successfully!', objectMessage.message)
+                await getLocalData()
+            }
         } catch (error: any) {
             openNotification('error', error.message)
         }
@@ -102,8 +108,12 @@ function ViewPage() {
         if (!id) return
         try {
             const response = await (window as any).electron.sinkronUsers(id)
-            openNotification('success', 'Account success Sinkron')
-            getLocalData()
+            const messageString = JSON.stringify(response)
+            const objectMessage = JSON.parse(messageString)
+            if(objectMessage.status === 200) {
+                openNotificationWithIcon('success', 'Account success Sinkron', objectMessage.message)
+                getLocalData()
+            }
         } catch (error: any) {
             openNotification('error', error.message)
         }
@@ -111,6 +121,7 @@ function ViewPage() {
 
     return (
         <div>
+            {contextHolder}
             <PageHeaders
                 title="Account Meta"
                 subTitle={
@@ -133,13 +144,13 @@ function ViewPage() {
                                 hoverable
                                 className="w-full"
                             >
-                                <div className="flex flex-col items-center">
+                                <div className="flex gap-4 items-center">
                                     <img
                                         src={account.profilePic}
                                         alt="avatar"
-                                        className="object-cover w-60 rounded-full py-3 px-2"
+                                        className="object-cover w-40 rounded-full py-3 px-2"
                                     />
-                                    <div className="text-center mt-4">
+                                    <div className="text-start mt-4">
                                         <p className="text-black text-lg">
                                             <strong>Instagram User:</strong>{' '}
                                             {account.userInstagram || '-'}
@@ -224,7 +235,7 @@ function ViewPage() {
                             rules={[
                                 {
                                     required: true,
-                                    message: 'Please input your account name!',
+                                    message: 'Please input your email / phone / account name',
                                 },
                             ]}
                         >

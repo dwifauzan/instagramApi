@@ -6,7 +6,6 @@ import {
   UilArrowUp,
 } from '@iconscout/react-unicons';
 import { Cards } from '@/components/cards/frame/cards-frame';
-import DashboardChart from '@/components/charts/DashboardChart';
 
 import chartData from '../../demoData/dashboardChartContent.json';
 
@@ -134,77 +133,6 @@ const SalesGrowth = React.memo(() => {
                   15%
                 </span>
               </div>
-            </div>
-            <div className="hexadash-chart-container relative">
-              <DashboardChart
-                id="hexadash-profit-growth"
-                labels={salesGrowthData[sellingTab].labels}
-                datasets={salesGrowthDataset}
-                type="bar"
-                layout={{
-                  padding: {
-                    left: -10,
-                    right: -10,
-                  },
-                }}
-                tooltip={{
-                  callbacks: {
-                    label(t:Tooltip) {
-                      const dstLabel = t.dataset.label;
-                      const { formattedValue } = t;
-                      return `  ${formattedValue} ${dstLabel}`;
-                    },
-                    labelColor(t:Tooltip) {
-                      return {
-                        backgroundColor: t.dataset.hoverBackgroundColor,
-                        borderColor: 'transparent',
-                      };
-                    },
-                  },
-                }}
-                scales={{
-                  y: {
-                    border: { 
-                      dash: [4, 4],
-                     },
-                    grid: {
-                      color: '#485e9029',
-                      tickLength: 0,
-                      drawBorder: false,
-                    },
-                    ticks: {
-                      beginAtZero: true,
-                      max: Math.max(...salesGrowthData[sellingTab].orders),
-                      stepSize: Math.max(...salesGrowthData[sellingTab].orders) / 5,
-                      font: {
-                        size: 13,
-                        family: "'Jost', sans-serif",
-                      },
-                      padding: 10,
-                      color: '#747474',
-                    },
-                  },
-
-                  x: {
-                    border:{
-                      display: false,
-                    },
-                    grid: {
-                      display: false,
-                    },
-                    ticks: {
-                      beginAtZero: true,
-                      font: {
-                        size: 12,
-                        family: "'Jost', sans-serif",
-                      },
-                      color: '#747474',
-                      min: 0,
-                    },
-                  },
-                }}
-                height={window.innerWidth < 1399 ? (window.innerWidth < 575 ? 300 : 100) : 188}
-              />
             </div>
           </>
         )}

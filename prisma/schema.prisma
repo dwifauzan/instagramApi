@@ -76,5 +76,6 @@ model FolderArsip {
   status         String         @default("pending")
   arsipId        Int
   arsip          Arsip          @relation("ArsipToFolderArsip", fields: [arsipId], references: [id])
+  sumber         String
   detail_content DetailContent? @relation("FolderArsipToDetailContent")
 }

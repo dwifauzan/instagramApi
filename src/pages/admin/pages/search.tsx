@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Row, Col, Pagination, AutoComplete, Input, Card, Spin } from 'antd'
+import { Row, Col, Pagination, AutoComplete, Input, Card, Spin, Modal } from 'antd'
 import debounce from 'lodash.debounce'
 import { PageHeaders } from '@/components/page-headers'
 import Image from 'next/image'
 import useNotification from '../crud/axios/handler/error'
-import { useInstagram } from '@/pages/api/hooks/useInstagram'
-import { useCache } from '@/pages/api/hooks/useCache'
+import { useRouter } from 'next/router'
 
 type User = {
     pk: number
@@ -34,10 +33,6 @@ type AllSearchData = {
 }
 
 function SearchResult() {
-    const { getCacheItem, setCacheItem } = useCache({
-        prefix: 'search_',
-        ttl: 60 * 60 * 1000,
-    })
     const [searchQuery, setSearchQuery] = useState('')
     const [allData, setAllData] = useState<AllSearchData>({
         users: [],
@@ -45,27 +40,21 @@ function SearchResult() {
         locations: [],
     })
     const [activeValue, setActiveValue] = useState('all')
-
+    const [nextMaxPage, setNextMaxPage] = useState<string | null>(null)
     const [currentUsers, setCurrentUsers] = useState(1)
     const [currentHashtags, setCurrentHashtags] = useState(1)
     const [currentLocations, setCurrentLocations] = useState(1)
     const [pageSize, setPageSize] = useState(10)
-
-    const { openNotificationWithIcon, contextHolder } = useNotification()
+    const [isloading, setIsLoading] = useState(false)
+    const [error, setError] = useState()
     const path = '/admin'
-
-    const { search, isLoading, error } = useInstagram()
+    const router = useRouter()
+    const { openNotificationWithIcon, contextHolder } = useNotification()
+    const [isLoginProcessing, setIsLoginProcessing] = useState(false);
 
     const fetchSearchResults = useCallback(async (query: string) => {
+        setIsLoading(true)
         try {
-            const cacheKey = `search_${query}`
-            const cachedData = getCacheItem<AllSearchData>(cacheKey)
-
-            if (cachedData) {
-                setAllData(cachedData)
-                return
-            }
-
             const defaultAccount = localStorage.getItem('default')
             if (!defaultAccount) {
                 openNotificationWithIcon(
@@ -81,27 +70,25 @@ function SearchResult() {
                 query
             }
             const searchResults = await (window as any).electron.search(dataSearch)
-            console.log(searchResults)
-            if (error) {
-                openNotificationWithIcon(
-                    'error',
-                    'Failed to load search results',
-                    error.includes('login_required')
-                        ? 'Akun terkena chalenge'
-                        : error
-                )
+            console.log(searchResults.data)
+            const sanitizedData = {
+                users: Array.isArray(searchResults?.data?.users) ? searchResults.data.users : [],
+                hashtags: Array.isArray(searchResults?.data?.hashtags) ? searchResults.data.hashtags : [],
+                locations: Array.isArray(searchResults?.data?.locations) ? searchResults.data.locations : [],
             }
-            setAllData(
-                searchResults || {
-                    users: [],
-                    hashtags: [],
-                    locations: [],
-                }
-            )
-            setCacheItem(cacheKey, searchResults)
+            
+            console.log('Sanitized data:', sanitizedData)
+            setAllData(sanitizedData)
         } catch (error) {
             console.error('Failed to load search results:', error)
             openNotificationWithIcon('error', 'Failed to load', `${error}`)
+            setAllData({
+                users: [],
+                hashtags: [],
+                locations: [],
+            })
+        } finally {
+            setIsLoading(false)
         }
     }, [])
 
@@ -120,87 +107,239 @@ function SearchResult() {
         setSearchQuery(value)
     }
 
+    const hashtags = async (name: string) => {
+        console.log('Hashtag clicked:', name) // Tambahkan log
+        setIsLoginProcessing(true)
+        try {
+            const defaultAccount = localStorage.getItem('default')
+            if (!defaultAccount) {
+                openNotificationWithIcon(
+                    'error',
+                    'User tidak ditemukan',
+                    'User tidak ditemukan, harap login kembali.'
+                )
+                return
+            }
+            const dataHastags = {
+                query: name as string,
+                username: defaultAccount,
+                nextMaxId: nextMaxPage ?? undefined
+            }
+            const response = await (window as any).electron.getFeedsByHastag(dataHastags)
+            const messageString = JSON.stringify(response)
+            const objectMessage = JSON.parse(messageString)
+            console.log('ini error response ', objectMessage);
+            if (objectMessage !== 200) {
+                openNotificationWithIcon(
+                    'error',
+                    'failed to get feeds',
+                    objectMessage.error
+                )
+                setIsLoginProcessing(false)
+            }
+
+            if (!response.data.feeds?.length) {
+                openNotificationWithIcon(
+                    'error',
+                    'No more feeds',
+                    'All feeds have been loaded'
+                )
+                setIsLoginProcessing(false)
+                return
+            }
+            console.log('ini adalah hasil riset hastags : ', response.data)
+            await router.push({
+                pathname: '/admin/pages/blog/two',
+                query: { name, response: JSON.stringify(response) }
+            })
+        } catch (error) {
+            console.error('Navigation error:', error)
+            setIsLoginProcessing(false)
+        }finally{
+            setIsLoading(false)
+        }
+    }
+
+    const getFeedsByUsername = async (pk: string | number, username: string) => {
+        console.log('Username clicked:', pk) // Tambahkan log
+        try {
+            setIsLoginProcessing(true)
+            const defaultAccount = localStorage.getItem('default')
+            if (!defaultAccount) {
+                openNotificationWithIcon(
+                    'error',
+                    'User tidak ditemukan',
+                    'User tidak ditemukan, harap login kembali.'
+                )
+                return
+            }
+            const dataAccount = {
+                pk: pk as string,
+                username: defaultAccount,
+                nextMaxId: nextMaxPage ?? undefined
+            }
+            const response = await (window as any).electron.getFeedsByUsername(dataAccount);
+            const messageString = JSON.stringify(response)
+            const objectMessage = JSON.parse(messageString)
+            if (objectMessage !== 200) {
+                openNotificationWithIcon(
+                    'error',
+                    'failed to get feeds',
+                    objectMessage.error
+                )
+                setIsLoginProcessing(false)
+            }
+
+            if (!response.data.feeds?.length) {
+                openNotificationWithIcon(
+                    'error',
+                    'No more feeds',
+                    'All feeds have been loaded'
+                )
+                setIsLoginProcessing(false)
+                return
+            }
+            console.log('ini adalah hasil riset hastags : ', response.data)
+          
+            await router.push({
+                pathname: '/admin/pages/blog/four',
+                query: { pk, username, response: JSON.stringify(response) }
+            })
+        } catch (error) {
+            setIsLoginProcessing(false)
+            console.error('Navigation error:', error)
+        }
+    }
+
+    const getFeedsByLocation = async (locationId: string | number) => {
+        console.log('Location clicked:', locationId) // Tambahkan log
+        try {
+            setIsLoginProcessing(true)
+            const defaultAccount = localStorage.getItem('default')
+            if (!defaultAccount) {
+                openNotificationWithIcon(
+                    'error',
+                    'User tidak ditemukan',
+                    'User tidak ditemukan, harap login kembali.'
+                )
+                return
+            }
+            const dataLocation = {
+                locationId: locationId as string,
+                username: defaultAccount,
+                nextMaxId: nextMaxPage ?? undefined
+            }
+    
+            const response = await (window as any).electron.getFeedsByLocation(dataLocation);
+            const messageString = JSON.stringify(response)
+            const objectMessage = JSON.parse(messageString)
+            if (objectMessage !== 200) {
+                openNotificationWithIcon(
+                    'error',
+                    'failed to get feeds',
+                    objectMessage.error
+                )
+                setIsLoginProcessing(false)
+            }
+
+            if (!response.data.feeds?.length) {
+                openNotificationWithIcon(
+                    'error',
+                    'No more feeds',
+                    'All feeds have been loaded'
+                ) 
+                setIsLoginProcessing(false)
+                return
+            }
+            console.log('ini adalah hasil riset hastags : ', response.data)
+            await router.push({
+                pathname: '/admin/pages/blog/one',
+                query: { locationId, response: JSON.stringify(response) }
+            })
+        } catch (error) {
+            console.error('Navigation error:', error)
+        }
+    }
+
     const renderItem = (item: User | Hashtag | Location) => {
         if ('username' in item) {
             return (
                 <Col key={item.pk} span={6} className="mb-4">
-                    <Link href={`${path}/pages/blog/four?pk=${item.pk}`}>
-                        <Card>
-                            <div className="flex items-center space-x-4">
-                                <Image
-                                    width={50}
-                                    height={50}
-                                    className="rounded-full"
-                                    src={item.profile_pic_url}
-                                    alt={item.username}
-                                />
-                                <Card.Meta
-                                    title={
-                                        <div className="text-sm font-medium text-gray-900 truncate">
-                                            {item.full_name}
-                                        </div>
-                                    }
-                                    description={`username: ${item.username}`}
-                                />
+                   <div className="p-4 bg-white rounded-lg shadow hover:shadow-md cursor-pointer transition-all" onClick={() => getFeedsByUsername(item.pk, item.username)}>
+                    <div className="flex items-center space-x-4">
+                        <img
+                            width={50}
+                            height={50}
+                            className="rounded-full"
+                            src={item.profile_pic_url}
+                            alt={item.username}
+                            referrerPolicy="no-referrer"
+                            crossOrigin="anonymous"
+                            onError={(e: any) => {
+                                e.target.src = '/hexadash-nextjs/avatar-default.jpg'
+                            }}
+                        />
+                        <div>
+                            <div className="text-sm font-medium text-gray-900 truncate">
+                                {item.full_name}
                             </div>
-                        </Card>
-                    </Link>
+                            <div className="text-sm text-gray-500">
+                                username: {item.username}
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 </Col>
             )
         } else if ('name' in item && 'formatted_media_count' in item) {
             return (
                 <Col key={item.id} span={6} className="mb-4">
-                    <Link href={`${path}/pages/blog/two?name=${item.name}`}>
-                        <Card>
-                            <div className="flex items-center space-x-4">
-                                <img
-                                    width={50}
-                                    height={50}
-                                    className="rounded-full"
-                                    src="/hexadash-nextjs/hastag.jpg"
-                                    alt="hashtag"
-                                />
-                                <Card.Meta
-                                    title={
-                                        <div className="text-sm font-medium text-gray-900 truncate">
-                                            #{item.name}
-                                        </div>
-                                    }
-                                    description={`Posts: ${item.formatted_media_count}`}
-                                />
+                    <div 
+                        onClick={() => hashtags(item.name)}
+                        className="p-4 bg-white rounded-lg shadow hover:shadow-md cursor-pointer transition-all"
+                    >
+                        <div className="flex items-center space-x-4">
+                            <img
+                                width={50}
+                                height={50}
+                                className="rounded-full"
+                                src="https://img.freepik.com/free-vector/young-people-with-hashtag-symbol_23-2148115234.jpg?t=st=1733113188~exp=1733116788~hmac=9ee91fdbc9ae9b19a9a3fa9830f3ea40abfe5c400b08362962dc3371337ba6d5&w=740"
+                                alt="hashtag"
+                            />
+                            <div>
+                                <div className="text-sm font-medium text-gray-900 truncate">
+                                    #{item.name}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                    Posts: {item.formatted_media_count}
+                                </div>
                             </div>
-                        </Card>
-                    </Link>
+                        </div>
+                    </div>
                 </Col>
             )
         } else if ('address' in item) {
             return (
                 <Col key={item.external_id} span={6} className="mb-4">
-                    <Link
-                        href={`${path}/pages/blog/one?locationId=${item.external_id}`}
-                    >
-                        <Card>
-                            <div className="flex items-center space-x-4">
-                                <img
-                                    width={50}
-                                    height={50}
-                                    className="rounded-full"
-                                    src="/hexadash-nextjs/locate.jpg"
-                                    alt="location"
-                                />
-                                <Card.Meta
-                                    title={
-                                        <div className="text-sm font-medium text-gray-900 truncate">
-                                            {item.name}
-                                        </div>
-                                    }
-                                    description={`Address: ${
-                                        item.address || 'lokasi tidak ditemukan'
-                                    }`}
-                                />
+                    <div className="p-4 bg-white rounded-lg shadow hover:shadow-md cursor-pointer transition-all" onClick={() => getFeedsByLocation(item.external_id)}>
+                    <div className="flex items-center space-x-4">
+                        <img
+                            width={50}
+                            height={50}
+                            className="rounded-full"
+                            src="https://img.freepik.com/free-vector/location_53876-25530.jpg?t=st=1733113216~exp=1733116816~hmac=c1660bd0992212da1728efc16ac4b49a5bbf322ab39983b9ce046bfb13370f91&w=740"
+                            alt="location"
+                        />
+                        <div>
+                            <div className="text-sm font-medium text-gray-900 truncate">
+                                {item.name}
                             </div>
-                        </Card>
-                    </Link>
+                            <div className="text-sm text-gray-500">
+                                Address: {item.address || 'lokasi tidak ditemukan'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 </Col>
             )
         }
@@ -266,52 +405,36 @@ function SearchResult() {
                     <Col xs={24}>
                         <div className="bg-white dark:bg-white/10 p-6 rounded-lg">
                             <div className="result-list-content">
-                                {isLoading ? (
+                                {isloading ? (
                                     <Spin tip="Loading..." />
                                 ) : error ? (
                                     <p>Tidak ada data</p>
                                 ) : (
                                     <Row gutter={12}>
-                                        {activeValue === 'all' &&
-                                            [
-                                                ...allData.users,
-                                                ...allData.hashtags,
-                                                ...allData.locations,
-                                            ]
-                                                .slice(
-                                                    (currentUsers - 1) *
-                                                        pageSize,
-                                                    currentUsers * pageSize
-                                                )
-                                                .map(renderItem)}
-
-                                        {activeValue === 'tagar' &&
-                                            allData.hashtags
-                                                .slice(
-                                                    (currentHashtags - 1) *
-                                                        pageSize,
-                                                    currentHashtags * pageSize
-                                                )
-                                                .map(renderItem)}
-
-                                        {activeValue === 'location' &&
-                                            allData.locations
-                                                .slice(
-                                                    (currentLocations - 1) *
-                                                        pageSize,
-                                                    currentLocations * pageSize
-                                                )
-                                                .map(renderItem)}
-
-                                        {activeValue === 'account' &&
-                                            allData.users
-                                                .slice(
-                                                    (currentUsers - 1) *
-                                                        pageSize,
-                                                    currentUsers * pageSize
-                                                )
-                                                .map(renderItem)}
-                                    </Row>
+                                    {activeValue === 'all' && Array.isArray(allData.users) && Array.isArray(allData.hashtags) && Array.isArray(allData.locations) && (
+                                        [...allData.users, ...allData.hashtags, ...allData.locations]
+                                            .slice((currentUsers - 1) * pageSize, currentUsers * pageSize)
+                                            .map(renderItem)
+                                    )}
+                                
+                                    {activeValue === 'tagar' && Array.isArray(allData.hashtags) && (
+                                        allData.hashtags
+                                            .slice((currentHashtags - 1) * pageSize, currentHashtags * pageSize)
+                                            .map(renderItem)
+                                    )}
+                                
+                                    {activeValue === 'location' && Array.isArray(allData.locations) && (
+                                        allData.locations
+                                            .slice((currentLocations - 1) * pageSize, currentLocations * pageSize)
+                                            .map(renderItem)
+                                    )}
+            
+                                    {activeValue === 'account' && Array.isArray(allData.users) && (
+                                        allData.users
+                                            .slice((currentUsers - 1) * pageSize, currentUsers * pageSize)
+                                            .map(renderItem)
+                                    )}
+                                </Row>
                                 )}
                             </div>
                             {activeValue === 'all' && (
@@ -373,6 +496,33 @@ function SearchResult() {
                         </div>
                     </Col>
                 </Row>
+
+                <Modal
+                    open={isLoginProcessing}
+                    footer={null}
+                    closable={false}
+                    centered
+                    width={400}
+                    className="p-0"
+                >
+                    <div className="flex flex-col items-center justify-center py-8 px-6 text-center">
+                        <Spin size="large" className="mb-6" />
+                        <h2 className="text-xl font-semibold mb-4 text-gray-800">
+                            Processing Request
+                        </h2>
+                        <div className="space-y-2 text-gray-600">
+                            <p className="text-base">
+                                Scraper to Instagram...
+                            </p>
+                            <p className="text-sm">
+                                Please wait while we process your request
+                            </p>
+                        </div>
+                        <div className="mt-6 w-full max-w-xs bg-gray-200 rounded-full h-1.5">
+                            <div className="bg-blue-500 h-1.5 rounded-full animate-pulse"></div>
+                        </div>
+                    </div>
+                </Modal>
             </main>
         </>
     )

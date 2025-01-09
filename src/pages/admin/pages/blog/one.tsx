@@ -27,6 +27,12 @@ interface MediaItem {
     url: string
 }
 
+interface sendFeed {
+    url: string[]
+    caption: string
+    sumber?: string
+}
+
 interface Feed {
     id: string
     mediaItems: MediaItem[]
@@ -34,6 +40,7 @@ interface Feed {
     caption: string
     likeCount: number
     commentCount: number
+    sumber: string
     takenAt: Date
 }
 
@@ -52,13 +59,19 @@ const MediaRenderer = ({
 }) => {
     if (media.mediaType === 'photo') {
         return (
-            <Image
+            <img
                 src={media.url}
                 alt={media.mediaType}
                 width={450}
                 height={550}
                 className={className}
-                // onError={() => setError(true)}
+                referrerPolicy="no-referrer"
+                crossOrigin="anonymous"
+                onError={(e) => {
+                    const imgElement = e.target as HTMLImageElement;
+                    imgElement.onerror = null;
+                    imgElement.src = '/path/to/fallback-image.jpg';
+                }}
             />
         )
     } else {
@@ -66,7 +79,6 @@ const MediaRenderer = ({
             <video
                 controls
                 className={className}
-                // onError={() => setError(true)}
             >
                 <source src={media.url} type="video/mp4" />
             </video>
@@ -103,8 +115,8 @@ function BlogFour() {
     const [isLoadingMore, setIsLoadingMore] = useState(false)
     const scrollRef = useRef<HTMLDivElement | null>(null)
     const path = '/admin'
-
-    const { getFeedsByLocation, isLoading, error } = useInstagram()
+    const [feed, setFeed] = useState<sendFeed | null>(null)
+    const [repostModalVisible, setRepostModalVisible] = useState(false)
 
     const filteredFeeds = useMemo(() => {
         return feeds.filter((feed) => {
@@ -143,8 +155,22 @@ function BlogFour() {
     }, [filteredFeeds, sortCriteria])
 
     useEffect(() => {
-        if (router.query.locationId) {
-            fetchFeeds()
+        if (router.query.response) {
+            const responseParse = JSON.parse(router.query.response as string)
+            const cacheKey = `feeds_${router.query.response}`
+            setFeeds((prevFeeds) => {
+                const existingFeedIds = new Set(prevFeeds.map((feed) => feed.id))
+                const newFeeds = responseParse.data.feeds.filter(
+                    (feed: Feed) => !existingFeedIds.has(feed.id)
+                )
+                const updatedFeeds = [...prevFeeds, ...newFeeds]
+                setNextMaxPage(responseParse.data.nextMaxId)
+                setCacheItem(cacheKey, {
+                    feeds: updatedFeeds,
+                    nextMaxPage: responseParse.data.nextMaxId,
+                })
+                return updatedFeeds
+            })
         }
     }, [router.query.locationId]) // Tambahkan dependency
 
@@ -182,18 +208,20 @@ function BlogFour() {
                     return;
                 }
             }
+
+            const dataLocation = {
+                locationId: router.query.locationId as string,
+                username: defaultAccount,
+                nextMaxId: nextMaxPage ?? undefined
+            }
     
-            const response = await getFeedsByLocation(
-                router.query.locationId as string,
-                defaultAccount,
-                nextMaxPage ?? undefined
-            );
+            const response = await (window as any).electron.getFeedsByLocation(dataLocation);
     
             if (!response.success) {
                 throw new Error(response.message || 'Error get feeds');
             }
     
-            if (!response.feeds?.length) {
+            if (!response.data.feeds?.length) {
                 openNotificationWithIcon(
                     'error',
                     'No more feeds',
@@ -204,18 +232,18 @@ function BlogFour() {
     
             setFeeds((prevFeeds) => {
                 const existingFeedIds = new Set(prevFeeds.map((feed) => feed.id));
-                const newFeeds = response.feeds.filter(
+                const newFeeds = response.data.feeds.filter(
                     (feed: Feed) => !existingFeedIds.has(feed.id)
                 );
                 const updatedFeeds = [...prevFeeds, ...newFeeds];
                 setCacheItem(cacheKey, {
                     feeds: updatedFeeds,
-                    nextMaxPage: response.nextMaxId,
+                    nextMaxPage: response.data.nextMaxId,
                 });
                 return updatedFeeds;
             });
     
-            setNextMaxPage(response.nextMaxId);
+            setNextMaxPage(response.data.nextMaxId);
         } catch (err: any) {
             console.error('Failed to load feeds:', err);
             openNotificationWithIcon('error', 'Failed to load', err.message);
@@ -276,6 +304,7 @@ function BlogFour() {
                 mediaItems: feed.mediaItems.filter((media) =>
                     selectedMedia.has(`${feed.id}-${media.url}`)
                 ),
+                sumber: feed.sumber || 'unknown'
             }))
             .filter((feed) => feed.mediaItems.length > 0)
 
@@ -338,33 +367,62 @@ function BlogFour() {
     }
 
     const handlerRepost = async (feed: Feed) => {
-        try {
             const sendThis = {
                 url: feed.mediaItems.map((media) => media.url),
                 caption: feed.caption,
+                username: feed.sumber
             }
+            setFeed(sendThis)
+            setRepostModalVisible(true)
+    }
 
-            const response = await axios.post(
-                '/hexadash-nextjs/api/repostLoad',
-                sendThis
-            )
-            if (!response) {
-                openNotificationWithIcon(
-                    'error',
-                    'Repost failed',
-                    'Failed to send data to repost endpoint'
-                )
-                return
-            }
+    const handlerRepostLangsung = () => {
+        setRepostModalVisible(true)
+        try {
+            router.push({
+                pathname: `${path}/tables/schedule`,
+                query: {
+                    url: JSON.stringify(feed?.url),
+                    caption: feed?.caption,
+                    username: feed?.sumber
+                },
+            })
             openNotificationWithIcon(
                 'success',
                 'Repost success',
                 'success send api'
             )
-            await router.push(`${path}/tables/repost`)
+            setModalVisible(false)
+            // await router.push(`${path}/tables/repost`)
         } catch (err: any) {
             console.error('Repost failed:', err)
             openNotificationWithIcon('error', 'Repost failed', `${err.message}`)
+            setModalVisible(true)
+        }
+    }
+
+    const handlerRepostSchedule = () => {
+        setRepostModalVisible(true)
+        try {
+            router.push({
+                pathname: `${path}/tables/schedulee`,
+                query: {
+                    url: JSON.stringify(feed?.url),
+                    caption: feed?.caption,
+                    username: feed?.sumber
+                },
+            })
+            openNotificationWithIcon(
+                'success',
+                'Repost success',
+                'success send api'
+            )
+            setModalVisible(false)
+            // await router.push(`${path}/tables/repost`)
+        } catch (err: any) {
+            console.error('Repost failed:', err)
+            openNotificationWithIcon('error', 'Repost failed', `${err.message}`)
+            setModalVisible(true)
         }
     }
 
@@ -514,7 +572,7 @@ function BlogFour() {
                                                     toggleSelectMedia(feed)
                                                 }}
                                             />
-                                            <Image
+                                            <img
                                                 src={feed.mediaItems[0].url}
                                                 alt={
                                                     feed.mediaItems[0].mediaType
@@ -522,6 +580,13 @@ function BlogFour() {
                                                 width={250}
                                                 height={350}
                                                 className="rounded-md"
+                                                referrerPolicy="no-referrer"
+                                                crossOrigin="anonymous"
+                                                onError={(e) => {
+                                                    const imgElement = e.target as HTMLImageElement;
+                                                    imgElement.onerror = null;
+                                                    imgElement.src = '/path/to/fallback-image.jpg';
+                                                }}
                                             />
                                         </>
                                     ) : (
@@ -663,6 +728,68 @@ function BlogFour() {
                         Mengunduh {downloadProgress}% ({totalFiles} file)
                     </p>
                 </div>
+            </Modal>
+
+              {/* pop up ui repost */}
+              <Modal
+                open={repostModalVisible}
+                onCancel={() => setRepostModalVisible(false)}
+                footer={null}
+                className="px-3 py-5 bg-white shadow rounded"
+            >
+                <div className="flex items-center gap-3">
+                    <Col sm={12} xs={18} className="shadow-md">
+                        <div
+                            className="bg-white dark:bg-white/10 m-0 p-0 mb-[25px] rounded-10 relative"
+                            onClick={handlerRepostLangsung}
+                        >
+                            <div className="p-[25px]">
+                                <img
+                                    src="https://img.freepik.com/free-vector/appointment-booking-mobile-phone-with-calendar_23-2148550000.jpg?t=st=1730102155~exp=1730105755~hmac=6702631bf2696197b5d799acb373b4f0c4b676a7c58bb97a73984cd88b735cff&w=740"
+                                    width={430}
+                                    height={230}
+                                    alt=""
+                                />
+                                <h1 className="mb-0 text-lg text-dark dark:text-white/60 capitalize">
+                                    repost langsung
+                                </h1>
+                                <span className="capitalize fs-4">
+                                    hanya bisa schedule 1 postingan dan pastikan
+                                    anda sudah menyiapkan postigan
+                                </span>
+                            </div>
+                        </div>
+                    </Col>
+                    <Col sm={12} xs={18} className="shadow-md">
+                        <div
+                            onClick={handlerRepostSchedule}
+                            className="bg-white dark:bg-white/10 m-0 p-0 mb-[25px] rounded-10 relative"
+                        >
+                            <div className="p-[25px]">
+                                <img
+                                    src="https://img.freepik.com/free-vector/blogging-isometric-concept-with-content-plan-making-process-3d-illustration_1284-55140.jpg?t=st=1730102135~exp=1730105735~hmac=20350ad6179fee3ee13647178630e2dfa6201ddc053b0ad78bb8955e2ca5844e&w=740"
+                                    width={430}
+                                    height={230}
+                                    alt=""
+                                />
+                                <h1 className="mb-0 text-lg text-dark dark:text-white/60 capitalize">
+                                    schedule repost
+                                </h1>
+                                <span className="capitalize fs-4">
+                                    Schedule Masssal, Sebelum anda menggunakan
+                                    schedule massal pastikan anda membaca tata
+                                    cara menggunakannya
+                                </span>
+                            </div>
+                        </div>
+                    </Col>
+                </div>
+                <Button
+                    className="w-full px-4 py-2 bg-blue-400 text-white"
+                    onClick={() => setModalVisible(false)}
+                >
+                    Cancel
+                </Button>
             </Modal>
         </div>
     )
