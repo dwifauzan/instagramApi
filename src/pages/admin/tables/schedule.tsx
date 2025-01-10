@@ -94,13 +94,15 @@ const SchedulePage = () => {
         }
     }
 
-    useEffect(() => {
-        getRepostMedia()
-        if (url && typeof url === 'string') {
-            if (url.includes('.mp4')) {
-                setMediaFiles(url)
-            } else {
-                setMediaFiles(url)
+   useEffect(() => {
+        if (url) {
+            try {
+                const urlString = JSON.parse(url as string)[0]
+                console.log('ini adalah urlString ', urlString)
+                setMediaFiles(urlString)
+            } catch (error) {
+                console.error('Error parsing URL:', error)
+                // Handle error case
             }
         }
     }, [url])
